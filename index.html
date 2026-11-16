@@ -306,7 +306,7 @@ function pickPanel(){
 }
 
 function viewLog(){
-  const rows=S.products.filter(p=>p.status!=='停供'||qty(month,p.id));
+  const rows=S.products.filter(p=>qty(month,p.id)>0);
   const tot=rows.reduce((a,p)=>{
     const n=qty(month,p.id);
     a.n+=n;a.c+=costOf(month,p.id);a.r+=n*p.retail*10;a.f+=n*flagOf(p);
@@ -365,7 +365,7 @@ function viewLog(){
     }
   }
 
-  if(!rows.length)h+='<div class="card mu">还没有在售烟品。到「烟品目录」添加后，回来点 ＋ 录入。</div>';
+  if(!rows.length)h+='<div class="card mu">本月还没有开烟记录。点上方「＋ 新增开烟」建批次，再用「＋ 录入本次开烟」添加。</div>';
   const sb=bSel;
   rows.forEach(p=>{
     const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
@@ -556,3 +556,4 @@ migrate();
 render();
 </script>
 </body></html>
+
