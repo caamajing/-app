@@ -114,8 +114,6 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .pick{max-height:40vh;overflow-y:auto;display:grid;gap:6px;margin-top:6px}
 .pick .bitem{cursor:pointer}
 .pick .bitem:hover{border-color:var(--ac)}
-.pick .bitem.sel{background:var(--ac);border-color:var(--ac);color:#fff}
-.pick .bitem.sel .q,.pick .bitem.sel .nt{color:#fff;opacity:.85}
 </style>
 </head>
 <body>
@@ -272,6 +270,25 @@ function setPrice(m,id,src,b,price){
   if(f)f.price=Math.max(0,num(price));
 }
 
+function pickListHTML(){
+  const kw=pick.q.trim().toLowerCase();
+  const all=S.products.filter(p=>p.status!=='停供');
+  if(!all.length)return '<div class="mu" style="margin-top:8px">还没有烟品。先到「烟品目录」添加。</div>';
+  const list=kw?all.filter(p=>p.name.toLowerCase().includes(kw)):all;
+  if(!list.length)return '<div class="mu" style="margin-top:8px">没找到「'+esc(pick.q)+'」，换个关键词，或到烟品目录新增。</div>';
+  let h='<div class="pick">'+list.slice(0,8).map(p=>
+    '<div class="bitem" data-act="pick" data-v="'+p.id+'"><span class="no">'+esc(p.name.slice(0,2))+'</span>'+
+    '<span class="nt">'+esc(p.name)+'</span>'+
+    '<span class="q">烟草 '+fmt(p.cost)+(p.cost2?' · 烟贩 '+fmt(p.cost2):'')+'</span></div>'
+  ).join('')+'</div>';
+  if(list.length>8)h+='<div class="mu" style="margin-top:6px">还有 '+(list.length-8)+' 条，继续输入关键词缩小范围。</div>';
+  return h;
+}
+function refreshPickList(){
+  const box=$('#pk_list');if(!box)return;
+  box.innerHTML=pickListHTML();
+}
+
 function pickPanel(){
   if(!pick.open)return '';
   const curBid=(bSel!=='all'&&bt(month,bSel))?bSel:(bts(month)[0]||{}).id;
@@ -286,21 +303,8 @@ function pickPanel(){
       '</div>'+
       '<div class="row" style="margin-top:8px"><button data-act="repick">继续录下一款</button><button class="on" data-act="closePick">完成</button></div>';
   }else{
-    const kw=pick.q.trim().toLowerCase();
-    const list=S.products.filter(p=>p.status!=='停供'&&(!kw||p.name.toLowerCase().includes(kw)));
-    h+='<div style="margin-top:8px"><input id="pk_q" placeholder="输入关键词搜索烟品…" value="'+esc(pick.q)+'" autocomplete="off"></div>';
-    if(!S.products.filter(p=>p.status!=='停供').length){
-      h+='<div class="mu" style="margin-top:8px">还没有烟品。先到「烟品目录」添加。</div>';
-    }else if(!list.length){
-      h+='<div class="mu" style="margin-top:8px">没找到「'+esc(pick.q)+'」，换个关键词，或到烟品目录新增。</div>';
-    }else{
-      h+='<div class="pick">'+list.slice(0,8).map(p=>
-        '<div class="bitem" data-act="pick" data-v="'+p.id+'"><span class="no">'+esc(p.name.slice(0,2))+'</span>'+
-        '<span class="nt">'+esc(p.name)+'</span>'+
-        '<span class="q">烟草 '+fmt(p.cost)+(p.cost2?' · 烟贩 '+fmt(p.cost2):'')+'</span></div>'
-      ).join('')+'</div>';
-      if(list.length>8)h+='<div class="mu" style="margin-top:6px">还有 '+(list.length-8)+' 条，继续输入关键词缩小范围。</div>';
-    }
+    h+='<div style="margin-top:8px"><input id="pk_q" type="text" placeholder="输入关键词搜索烟品…" value="'+esc(pick.q)+'" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>'+
+      '<div id="pk_list">'+pickListHTML()+'</div>';
   }
   return h+'</div>';
 }
@@ -447,8 +451,22 @@ function render(){
   if(pick.open&&!pick.pid){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
 }
 
+let composing=false;
+document.addEventListener('compositionstart',e=>{
+  if(e.target.id==='pk_q')composing=true;
+});
+document.addEventListener('compositionend',e=>{
+  if(e.target.id==='pk_q'){
+    composing=false;
+    pick.q=e.target.value;
+    refreshPickList();
+  }
+});
 document.addEventListener('input',e=>{
-  if(e.target.id==='pk_q'){pick.q=e.target.value;render()}
+  if(e.target.id==='pk_q'){
+    pick.q=e.target.value;
+    if(!composing)refreshPickList();
+  }
 });
 document.addEventListener('change',e=>{
   const t=e.target;
