@@ -8,8 +8,9 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}
 *{box-sizing:border-box}
-html,body{margin:0}
-body{background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px;max-width:720px;margin:0 auto}
+html,body{margin:0;height:100%;overscroll-behavior:none}
+body{background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px;max-width:720px;margin:0 auto;height:100%;overflow:hidden;display:flex;flex-direction:column}
+#app{flex:1;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding-bottom:8px}
 h1{font-size:20px;margin:0}
 .sub{color:var(--mu);font-size:12px;margin:2px 0 12px}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
@@ -111,7 +112,7 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .btot::-webkit-scrollbar{display:none}
 .btot i{font-style:normal;color:var(--ac);margin:0 4px}
 /* ===== 录入面板（复用已有视觉，仅控制滚动） ===== */
-.pick{max-height:40vh;overflow-y:auto;display:grid;gap:6px;margin-top:6px}
+.pick{max-height:40vh;overflow-y:auto;display:grid;gap:6px;margin-top:6px;overscroll-behavior:contain}
 .pick .bitem{cursor:pointer}
 .pick .bitem:hover{border-color:var(--ac)}
 </style>
