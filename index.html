@@ -487,7 +487,7 @@ function ensureB(){
 }
 
 document.addEventListener('click',e=>{
-  const b=e.target.closest('button');if(!b||!b.dataset.act)return;
+  const b=e.target.closest('[data-act]');if(!b)return;
   const a=b.dataset.act,src=b.dataset.src;
   let v=b.dataset.v;
   if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
@@ -497,4 +497,62 @@ document.addEventListener('click',e=>{
   if(a==='import'){$('#impFile').click();return}
   if(a==='openPick'){pick={open:true,q:'',pid:null};bSel=curB();ss('bsel_'+month,bSel);render();return}
   if(a==='closePick'){pick={open:false,q:'',pid:null};render();return}
-  if(a==='repick'){pick.pid=null;pick.q='';render
+  if(a==='repick'){pick.pid=null;pick.q='';render();return}
+  if(a==='pick'){pick.pid=v;pick.q='';render();return}
+  if(a==='inc'||a==='dec'){
+    const p=P(v);if(!p)return;
+    const bid=ensureB(),s=src||'t';
+    const cur=bqtyOf(month,v,bid,s);
+    const next=a==='inc'?cur+1:cur-1;
+    const ph=s==='d'?(p.cost2||p.cost):p.cost;
+    const before=bpriceOf(month,v,bid,s);
+    setQty(month,v,s,bid,next,before!==''?before:ph);
+    if(bSel!==bid){bSel=bid;ss('bsel_'+month,bid)}
+    touch();render();
+  }else if(a==='newB'){bEdit='new';bDel=null;render()}
+  else if(a==='editB'){bEdit=v;bDel=null;render()}
+  else if(a==='cancelB'){bEdit=null;render()}
+  else if(a==='saveB'){
+    const d=$('#b_date').value||'';
+    const n=$('#b_note').value.trim();
+    if(bEdit==='new'){
+      const id=addBatch(month,d,n);bSel=id;ss('bsel_'+month,id);
+    }else{
+      const bt0=bt(month,bEdit);
+      if(bt0){bt0.date=d;bt0.note=n}
+      bSel=bEdit;ss('bsel_'+month,bEdit);
+    }
+    bEdit=null;touch();render();
+  }else if(a==='delB'){
+    if(bDel!==v){bDel=v;render();return}
+    delBatch(month,v);
+    if(bSel===v||bSel===String(v))bSel='all';
+    ss('bsel_'+month,bSel);
+    bDel=null;touch();render();
+  }else if(a==='new'){edit='new';render()}
+  else if(a==='edit'){edit=v;render()}
+  else if(a==='cancel'){edit=null;render()}
+  else if(a==='saveP'){
+    const name=$('#f_name').value.trim();if(!name)return;
+    const d={name,
+      cost:num($('#f_cost').value),
+      cost2:$('#f_cost2').value===''?0:num($('#f_cost2').value),
+      retail:num($('#f_retail').value),
+      actual:$('#f_actual').value===''?0:num($('#f_actual').value),
+      status:$('#f_status').value,
+      note:$('#f_note').value.trim()};
+    if(edit==='new')S.products.push(Object.assign({id:'p'+Date.now().toString(36)},d));
+    else Object.assign(P(edit),d);
+    edit=null;touch();render();
+  }else if(a==='del'){
+    if(delId!==v){delId=v;render();return}
+    S.products=S.products.filter(p=>p.id!==v);
+    months().forEach(m=>{delete S.log[m][v]});
+    delId=null;touch();render();
+  }
+});
+
+migrate();
+render();
+</script>
+</body></html>
