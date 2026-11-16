@@ -412,7 +412,7 @@ function viewSum(){
   const mt=ms.map(m=>S.products.reduce((a,p)=>a+qty(m,p.id),0));
   const mc=ms.map(m=>S.products.reduce((a,p)=>a+costOf(m,p.id),0));
   const mf=ms.map(m=>S.products.reduce((a,p)=>a+qty(m,p.id)*flagOf(p),0));
-  h+='<tr><td><b>当月合计</b></td>'+mt.map(x=>'<td><b>'+x+'</b></td>').join('')+'<td><b>'+mt.reduce((a,b)=>a+b,0)+'</b></td></tr>';
+  h+='<tr style="border-top:2px solid var(--ln)"><td style="padding-top:10px"><b>当月合计</b></td>'+mt.map(x=>'<td style="padding-top:10px"><b>'+x+'</b></td>').join('')+'<td style="padding-top:10px"><b>'+mt.reduce((a,b)=>a+b,0)+'</b></td></tr>';
   h+='<tr><td>进货成本</td>'+mc.map(x=>'<td>'+fmt0(x)+'</td>').join('')+'<td>'+fmt0(mc.reduce((a,b)=>a+b,0))+'</td></tr>';
   h+='<tr><td>红旗销售额</td>'+mf.map(x=>'<td>'+fmt0(x)+'</td>').join('')+'<td>'+fmt0(mf.reduce((a,b)=>a+b,0))+'</td></tr>';
   h+='<tr><td>实际利润</td>'+mf.map((x,i)=>{const v=x-mc[i];return '<td class="'+(v>=0?'ok':'err')+'">'+fmt0(v)+'</td>'}).join('')+'<td class="'+(mf.reduce((a,b)=>a+b,0)-mc.reduce((a,b)=>a+b,0)>=0?'ok':'err')+'">'+fmt0(mf.reduce((a,b)=>a+b,0)-mc.reduce((a,b)=>a+b,0))+'</td></tr>';
@@ -553,6 +553,8 @@ document.addEventListener('click',e=>{
   else if(a==='cancel'){edit=null;render()}
   else if(a==='saveP'){
     const name=$('#f_name').value.trim();if(!name)return;
+    const dup=S.products.find(p=>p.name===name&&p.id!==edit);
+    if(dup){alert('已经有同名烟品了：'+dup.name);return}
     const d={name,
       cost:num($('#f_cost').value),
       cost2:$('#f_cost2').value===''?0:num($('#f_cost2').value),
