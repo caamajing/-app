@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>香烟进销记录</title>
 <style>
 :root{--bg:#faf8f4;--card:#fff;--tx:#1d1b18;--mu:#7a746a;--ln:#e6e0d6;--ac:#b3402a;--ok:#2f7d4f;--warn:#c07d18;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -16,6 +16,7 @@ h1{font-size:20px;margin:0}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
 .tabs button{flex:1}
 button,input,select{font:inherit;color:var(--tx)}
+input,select,textarea{font-size:16px}
 button{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:7px 10px;cursor:pointer}
 button.on{background:var(--ac);border-color:var(--ac);color:#fff}
 input,select{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:7px 8px;width:100%;box-sizing:border-box;max-width:100%}
@@ -89,7 +90,7 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .src .step b{min-width:24px;font-size:15px}
 .src .pr{flex:1;display:flex;align-items:center;gap:4px}
 .src .pr span{font-size:11px;color:var(--mu);white-space:nowrap}
-.src .pr input{padding:4px 6px;font-size:13px;border-radius:6px}
+.src .pr input{padding:4px 6px;font-size:16px;border-radius:6px}
 .src.off{opacity:.4}
 .srcs .sum{font-size:11px;color:var(--mu);text-align:right}
 /* ===== 开烟批次 ===== */
