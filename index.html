@@ -1,629 +1,500 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>香烟进销记录</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: #0f1115; color: #e6e8eb; min-height: 100vh; padding: 24px;
-  }
-  .container { max-width: 960px; margin: 0 auto; }
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding-bottom: 20px; border-bottom: 1px solid #23262d; margin-bottom: 20px; gap: 12px; flex-wrap: wrap;
-  }
-  h1 { font-size: 22px; font-weight: 600; letter-spacing: .5px; }
-  .sub { font-size: 12px; color: #6b7280; margin-top: 4px; font-weight: 400; }
-  .btn {
-    background: #2563eb; color: #fff; border: 1px solid #2563eb; border-radius: 8px;
-    padding: 9px 16px; font-size: 14px; cursor: pointer; transition: .15s;
-  }
-  .btn:hover { background: #1d4ed8; }
-  .btn.ghost { background: transparent; border: 1px solid #333842; color: #c7ccd4; }
-  .btn.ghost:hover { background: #1a1d23; }
-  .btn.sm { padding: 4px 10px; font-size: 12px; }
-  input[type="text"], input[type="password"], input[type="number"],
-  input[type="month"], input[type="date"], select {
-    background: #161a20; border: 1px solid #2a2f38; border-radius: 8px;
-    color: #e6e8eb; padding: 9px 12px; font-size: 14px; outline: none; width: 100%;
-  }
-  input:focus, select:focus { border-color: #2563eb; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
-  .tabs .btn { flex: 1; }
-  .tabs .btn.on { background: #2563eb; border-color: #2563eb; }
-  .tabs .btn:not(.on) { background: #161a20; border-color: #23262d; color: #c7ccd4; }
-  .card {
-    background: #161a20; border: 1px solid #23262d; border-radius: 12px;
-    padding: 16px; margin-bottom: 12px;
-  }
-  .card h3 { font-size: 15px; margin-bottom: 6px; color: #fff; }
-  .card p { font-size: 13px; color: #8b93a1; line-height: 1.6; }
-  .mu { font-size: 12px; color: #8b93a1; line-height: 1.6; }
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
-  .kpi { background: #161a20; border: 1px solid #23262d; border-radius: 10px; padding: 12px; }
-  .kpi .label { font-size: 11px; color: #6b7280; margin-bottom: 5px; }
-  .kpi .value { font-size: 18px; font-weight: 600; color: #fff; }
-  .green { color: #34d399; } .red { color: #f87171; } .blue { color: #60a5fa; }
-  .tag {
-    font-size: 11px; padding: 2px 8px; border-radius: 999px;
-    background: #3b1d1d; color: #f87171; border: 1px solid #7f1d1d; margin-left: 8px; vertical-align: middle;
-  }
-  .tag.ok { background: #14361f; color: #34d399; border-color: #1f5c37; }
-  .bar { height: 5px; border-radius: 3px; background: #2563eb; margin-top: 8px; opacity: .7; }
-  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; }
-  .chip {
-    flex: 0 0 auto; font-size: 12px; padding: 6px 12px; border-radius: 999px;
-    border: 1px solid #2a2f38; background: #161a20; color: #c7ccd4; cursor: pointer; white-space: nowrap;
-  }
-  .chip.on { background: #2563eb; border-color: #2563eb; color: #fff; }
-  .bitem {
-    display: flex; align-items: center; gap: 10px; font-size: 13px;
-    border: 1px solid #23262d; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;
-  }
-  .bitem .no {
-    font-size: 11px; color: #60a5fa; border: 1px solid #2563eb;
-    border-radius: 999px; padding: 1px 7px; flex: 0 0 auto;
-  }
-  .bitem .dt { font-weight: 600; flex: 0 0 auto; }
-  .bitem .nt { color: #8b93a1; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .bitem .q { color: #8b93a1; flex: 0 0 auto; }
-  .srcs { margin-top: 10px; border-top: 1px dashed #2a2f38; padding-top: 10px; display: grid; gap: 8px; }
-  .src { display: flex; align-items: center; gap: 10px; }
-  .src .nm { font-size: 12px; min-width: 36px; color: #8b93a1; }
-  .src .nm.t { color: #34d399; } .src .nm.d { color: #f59e0b; }
-  .step { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-  .step b { min-width: 26px; text-align: center; font-size: 16px; }
-  .step button {
-    width: 30px; height: 30px; padding: 0; font-size: 17px; line-height: 1;
-    background: #0f1115; border: 1px solid #2a2f38; color: #e6e8eb; border-radius: 8px; cursor: pointer;
-  }
-  .step button:hover { border-color: #2563eb; }
-  .src .pr { flex: 1; display: flex; align-items: center; gap: 5px; }
-  .src .pr span { font-size: 11px; color: #6b7280; white-space: nowrap; }
-  .src .pr input { padding: 5px 8px; font-size: 13px; }
-  .src.off { opacity: .4; }
-  .empty { text-align: center; color: #6b7280; padding: 28px 0; font-size: 13px; }
-  .status { font-size: 12px; color: #f59e0b; margin-bottom: 14px; }
-  .status.ok { color: #34d399; } .status.err { color: #f87171; }
-  .review-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .review-table th, .review-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #23262d; }
-  .review-table th { color: #6b7280; font-weight: 500; font-size: 12px; }
-  .review-table td { color: #c7ccd4; }
-  .review-table td.up { color: #f87171; font-weight: 600; }
-  .scroll { overflow-x: auto; }
-  .scroll table { border-collapse: collapse; width: 100%; font-size: 13px; }
-  .scroll th, .scroll td { padding: 8px; border-bottom: 1px solid #23262d; text-align: right; white-space: nowrap; }
-  .scroll th:first-child, .scroll td:first-child { text-align: left; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
-  .grid .full { grid-column: 1/-1; }
-  .field label { display: block; font-size: 12px; color: #8b93a1; margin-bottom: 5px; }
-  .hint { font-size: 11px; color: #5c6472; margin-top: 4px; }
-  /* 搜索录入 */
-  .pick { position: relative; }
-  .picklist {
-    border: 1px solid #2a2f38; border-radius: 8px; margin-top: 6px; overflow: hidden;
-    max-height: 232px; overflow-y: auto; background: #0f1115;
-  }
-  .pickitem { padding: 10px 12px; border-bottom: 1px solid #1c2027; cursor: pointer; }
-  .pickitem:last-child { border-bottom: none; }
-  .pickitem:hover { background: #161a20; }
-  .pickitem b { font-size: 13px; color: #fff; font-weight: 500; }
-  .pickitem .mu { font-size: 11px; }
-  .chosen {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    border: 1px solid #2563eb; border-radius: 8px; padding: 10px 12px; background: #0f1115;
-  }
+:root{--bg:#faf8f4;--card:#fff;--tx:#1d1b18;--mu:#7a746a;--ln:#e6e0d6;--ac:#b3402a;--ok:#2f7d4f;--warn:#c07d18;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px;max-width:720px;margin:0 auto}
+h1{font-size:20px;margin:0}
+.sub{color:var(--mu);font-size:12px;margin:2px 0 12px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{flex:1}
+button,input,select{font:inherit;color:var(--tx)}
+button{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:7px 10px;cursor:pointer}
+button.on{background:var(--ac);border-color:var(--ac);color:#fff}
+input,select{background:var(--card);border:1px solid var(--ln);border-radius:8px;padding:7px 8px;width:100%;box-sizing:border-box;max-width:100%}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:12px;margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.mu{color:var(--mu);font-size:12px}
+.bar{height:6px;border-radius:3px;background:var(--ac);margin-top:6px;opacity:.75}
+.step{display:flex;align-items:center;gap:8px}
+.step b{min-width:28px;text-align:center;font-size:17px}
+.step button{width:34px;height:34px;padding:0;font-size:18px}
+.kpi{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+.kpi div{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px}
+.kpi b{display:block;font-size:18px}
+.kpi .mu{display:block;margin-bottom:2px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--ln);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--bg)}
+.tag{font-size:11px;padding:1px 6px;border-radius:8px;border:1px solid var(--ln);color:var(--mu)}
+.tag.warn{color:var(--ac);border-color:var(--ac)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.grid .full{grid-column:1/-1}
+.badge{font-size:12px;color:var(--mu)}
+.ok{color:var(--ok)}
+.err{color:var(--ac)}
+/* ===== 日期选择器：与整体主题统一 ===== */
+input[type="month"],input[type="date"]{
+  appearance:none;-webkit-appearance:none;
+  background:var(--card);
+  color:var(--tx);
+  border:1px solid var(--ln);
+  border-radius:8px;
+  padding:8px 10px;
+  font:inherit;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  display:block;
+  margin-bottom:10px;
+  cursor:pointer;
+  transition:border-color .15s,box-shadow .15s;
+}
+input[type="month"]:hover,input[type="date"]:hover{border-color:var(--ac)}
+input[type="month"]:focus,input[type="date"]:focus{
+  outline:none;
+  border-color:var(--ac);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 18%,transparent);
+}
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator{
+  cursor:pointer;
+  opacity:.55;
+  transition:opacity .15s;
+}
+input[type="month"]:hover::-webkit-calendar-picker-indicator,
+input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]) input[type="month"]::-webkit-calendar-picker-indicator,
+  :root:not([data-theme="light"]) input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.85)}
+}
+:root[data-theme="dark"] input[type="month"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.85)}
+/* ===== 货源录入行 ===== */
+.srcs{margin-top:8px;border-top:1px dashed var(--ln);padding-top:8px;display:grid;gap:6px}
+.src{display:flex;align-items:center;gap:8px}
+.src .nm{font-size:12px;min-width:34px;color:var(--mu)}
+.src .nm.t{color:var(--ok)}
+.src .nm.d{color:var(--warn)}
+.src .step{flex:0 0 auto}
+.src .step button{width:28px;height:28px;font-size:16px}
+.src .step b{min-width:24px;font-size:15px}
+.src .pr{flex:1;display:flex;align-items:center;gap:4px}
+.src .pr span{font-size:11px;color:var(--mu);white-space:nowrap}
+.src .pr input{padding:4px 6px;font-size:13px;border-radius:6px}
+.src.off{opacity:.4}
+.srcs .sum{font-size:11px;color:var(--mu);text-align:right}
+/* ===== 开烟批次 ===== */
+.bh{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:10px;margin-bottom:10px}
+.bh>.row:first-child{margin-bottom:8px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:8px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;font-size:12px;padding:5px 10px;border-radius:16px;border:1px solid var(--ln);background:var(--card);cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.chip b{font-variant-numeric:tabular-nums}
+.bform{border-top:1px dashed var(--ln);padding-top:8px;display:grid;gap:6px}
+.blist{display:grid;gap:6px}
+.bitem{display:flex;align-items:center;gap:8px;font-size:12px;border:1px solid var(--ln);border-radius:8px;padding:6px 8px}
+.bitem .no{font-size:11px;color:var(--ac);border:1px solid var(--ac);border-radius:10px;padding:0 5px;flex:0 0 auto}
+.bitem .dt{font-weight:600;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.bitem .nt{color:var(--mu);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bitem .q{color:var(--mu);font-variant-numeric:tabular-nums;flex:0 0 auto}
+.bitem button{flex:0 0 auto;padding:3px 7px;font-size:11px;border-radius:6px}
+.btot{font-size:11px;color:var(--mu);margin-bottom:8px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+.btot::-webkit-scrollbar{display:none}
+.btot i{font-style:normal;color:var(--ac);margin:0 4px}
+/* ===== 录入面板（复用已有视觉，仅控制滚动） ===== */
+.pick{max-height:40vh;overflow-y:auto;display:grid;gap:6px;margin-top:6px}
+.pick .bitem{cursor:pointer}
+.pick .bitem:hover{border-color:var(--ac)}
+.pick .bitem.sel{background:var(--ac);border-color:var(--ac);color:#fff}
+.pick .bitem.sel .q,.pick .bitem.sel .nt{color:#fff;opacity:.85}
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <div>
-      <h1>香烟进销记录</h1>
-      <div class="sub" id="meta"></div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn ghost sm" id="exportBtn">导出备份</button>
-      <button class="btn ghost sm" id="importBtn">导入恢复</button>
-      <input type="file" id="impFile" accept="application/json,.json" style="display:none">
-    </div>
-  </header>
-
-  <div class="status" id="status"></div>
-
-  <div class="tabs">
-    <button class="btn" data-act="tab" data-v="log">月度开烟</button>
-    <button class="btn" data-act="tab" data-v="sum">汇总对比</button>
-    <button class="btn" data-act="tab" data-v="prod">烟品目录</button>
-  </div>
-
-  <div id="app"></div>
-</div>
+<h1>香烟进销记录</h1>
+<div class="sub" id="meta"></div>
+<div id="app"></div>
+<script type="application/json" id="data">{"products":[],"log":{},"updated":""}</script>
 <script>
-/* ===== 存储 ===== */
-const KEY = 'ciglog_data_v2';
-const $ = s => document.querySelector(s);
-const ss = (k, v) => { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) {} };
-const ym = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+const $=s=>document.querySelector(s);
+const KEY='ciglog_data_v2';
+const ss=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){}};
+const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=true,edit=null,delId=null,status='',tm;
+let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null;
+let pick={open:false,q:'',pid:null};
 
-let tab = ss('tab') || 'log';
-let month = ss('month') || ym(new Date());
-let bSel = ss('bsel_' + month) || 'all';
-let status = '', tm = null;
-let bEdit = null, bDel = null, edit = null, delId = null;
-let picking = false, pickKw = '', entry = null;
-
-/* 初始为空：首页不预置任何烟品与流水 */
-const SEED = { products: [], log: {}, updated: '' };
-
-function loadData() {
-  try { const raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw); } catch (e) {}
-  return JSON.parse(JSON.stringify(SEED));
+function loadData(){
+  try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw)}catch(e){}
+  try{return JSON.parse($('#data').textContent)}catch(e){return {products:[],log:{}}}
 }
-let S = loadData();
+let S=loadData();
 
-/* ===== 迁移 ===== */
-function splitLog(log) {
-  const batches = {}, rest = {};
-  Object.keys(log || {}).forEach(k => {
-    if (k === 'batches') { Object.assign(batches, log[k]); return; }
-    const v = log[k], r = {};
-    if (v && typeof v === 'object' && v.batches) batches[k] = v.batches;
-    Object.keys(v || {}).forEach(id => { if (id !== 'batches') r[id] = v[id]; });
-    rest[k] = r;
+function splitLog(log){
+  const batches={},rest={};
+  Object.keys(log).forEach(k=>{
+    if(k==='batches'){Object.assign(batches,log[k]);return}
+    const v=log[k],r={};
+    if(v&&typeof v==='object'&&v.batches){batches[k]=v.batches}
+    Object.keys(v||{}).forEach(id=>{if(id!=='batches')r[id]=v[id]});
+    rest[k]=r;
   });
-  return { batches, rest };
+  return {batches,rest};
 }
-function migrate() {
-  let B = {};
-  if (S._batches) { B = S._batches; delete S._batches; }
-  if (S.log && S.log.batches) Object.assign(B, splitLog(S.log).batches);
-  const { rest } = splitLog(S.log);
-  S.log = rest; S.log.batches = B;
-  months().forEach(m => {
-    Object.keys(S.log[m]).forEach(id => {
-      const v = S.log[m][id], p = P(id);
-      if (Array.isArray(v)) { S.log[m][id] = v.map(f => ({ b: f.b || 0, src: f.src, qty: f.qty, price: f.price })); return; }
-      if (typeof v === 'number') S.log[m][id] = v ? [{ b: 0, src: 't', qty: v, price: p ? p.cost : 0 }] : [];
-      else if (v && typeof v === 'object') {
-        const a = [];
-        if (v.t) a.push({ b: 0, src: 't', qty: v.t, price: p ? p.cost : 0 });
-        if (v.d) a.push({ b: 0, src: 'd', qty: v.d, price: p ? (p.cost2 || p.cost) : 0 });
-        S.log[m][id] = a;
-      } else S.log[m][id] = [];
+function migrate(){
+  let B={};
+  if(S._batches){B=S._batches;delete S._batches}
+  if(S.log.batches){Object.assign(B,splitLog(S.log).batches)}
+  const {rest}=splitLog(S.log);
+  S.log=rest;
+  S.log.batches=B;
+  months().forEach(m=>{
+    Object.keys(S.log[m]).forEach(id=>{
+      const v=S.log[m][id],p=P(id);
+      if(Array.isArray(v)){S.log[m][id]=v.map(f=>({b:f.b||0,src:f.src,qty:f.qty,price:f.price}));return}
+      if(typeof v==='number'){S.log[m][id]=v?[{b:0,src:'t',qty:v,price:p?p.cost:0}]:[]}
+      else if(v&&typeof v==='object'){
+        const a=[];
+        if(v.t)a.push({b:0,src:'t',qty:v.t,price:p?p.cost:0});
+        if(v.d)a.push({b:0,src:'d',qty:v.d,price:p?(p.cost2||p.cost):0});
+        S.log[m][id]=a;
+      }else{S.log[m][id]=[]}
     });
   });
 }
 
-/* ===== 工具 ===== */
-const fmt = n => (Math.round(n * 100) / 100).toLocaleString('zh-CN');
-const fmt0 = n => Math.round(n).toLocaleString('zh-CN');
-const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const P = id => S.products.find(p => p.id === id);
-const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const fmt=n=>(Math.round(n*100)/100).toLocaleString('zh-CN');
+const fmt0=n=>Math.round(n).toLocaleString('zh-CN');
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const P=id=>S.products.find(p=>p.id===id);
+const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n};
 
-const flow = (m, id) => { const v = S.log[m] && S.log[m][id]; return Array.isArray(v) ? v : []; };
-const months = () => Object.keys(S.log).filter(k => k !== 'batches');
-const bts = m => (S.log.batches && S.log.batches[m]) || [];
-const bt = (m, id) => bts(m).find(b => b.id === id);
-const inB = (f, b) => !b || b === 'all' || f.b === b;
-const bqty = (m, id, b) => flow(m, id).filter(f => inB(f, b)).reduce((a, f) => a + f.qty, 0);
-const bqtyOf = (m, id, b, src) => flow(m, id).filter(f => inB(f, b) && f.src === src).reduce((a, f) => a + f.qty, 0);
-const bcost = (m, id, b) => flow(m, id).filter(f => inB(f, b)).reduce((a, f) => a + f.qty * f.price, 0);
-const bpriceOf = (m, id, b, src) => { const f = flow(m, id).find(f => inB(f, b) && f.src === src); return f ? f.price : ''; };
-const btQty = (m, b) => S.products.reduce((a, p) => a + bqty(m, p.id, b), 0);
-const btCost = (m, b) => S.products.reduce((a, p) => a + bcost(m, p.id, b), 0);
-const btFlag = (m, b) => S.products.reduce((a, p) => a + bqty(m, p.id, b) * flagOf(p), 0);
-const qty = (m, id) => bqty(m, id, 'all');
-const costOf = (m, id) => bcost(m, id, 'all');
-const flagOf = p => p.actual || (p.retail * 10);
+function flow(m,id){const v=S.log[m]&&S.log[m][id];return Array.isArray(v)?v:[]}
+const months=()=>Object.keys(S.log).filter(k=>k!=='batches');
+const bts=m=>(S.log.batches&&S.log.batches[m])||[];
+const bt=(m,id)=>bts(m).find(b=>b.id===id);
+const inB=(f,b)=>!b||b==='all'||f.b===b;
+const bqty=(m,id,b)=>flow(m,id).filter(f=>inB(f,b)).reduce((a,f)=>a+f.qty,0);
+const bqtyOf=(m,id,b,src)=>flow(m,id).filter(f=>inB(f,b)&&f.src===src).reduce((a,f)=>a+f.qty,0);
+const bcost=(m,id,b)=>flow(m,id).filter(f=>inB(f,b)).reduce((a,f)=>a+f.qty*f.price,0);
+const bpriceOf=(m,id,b,src)=>{const f=flow(m,id).find(f=>inB(f,b)&&f.src===src);return f?f.price:''};
+const btQty=(m,b)=>S.products.reduce((a,p)=>a+bqty(m,p.id,b),0);
+const btCost=(m,b)=>S.products.reduce((a,p)=>a+bcost(m,p.id,b),0);
+const btFlag=(m,b)=>S.products.reduce((a,p)=>a+bqty(m,p.id,b)*flagOf(p),0);
+const qty=(m,id)=>bqty(m,id,'all');
+const costOf=(m,id)=>bcost(m,id,'all');
+const flagOf=p=>p.actual||(p.retail*10);
 
-/* ===== 批次 ===== */
-function addBatch(m, date, note) {
-  S.log.batches = S.log.batches || {};
-  const arr = S.log.batches[m] = S.log.batches[m] || [];
-  const id = arr.reduce((a, b) => Math.max(a, b.id), 0) + 1;
-  arr.push({ id, date, note });
-  arr.sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.id - b.id);
+function addBatch(m,date,note){
+  S.log.batches=S.log.batches||{};
+  const arr=S.log.batches[m]=S.log.batches[m]||[];
+  const id=arr.reduce((a,b)=>Math.max(a,b.id),0)+1;
+  arr.push({id,date,note});
+  arr.sort((a,b)=>String(a.date).localeCompare(String(b.date))||a.id-b.id);
   return id;
 }
-function delBatch(m, id) {
-  S.log.batches[m] = bts(m).filter(b => b.id !== id);
-  if (!S.log.batches[m].length) delete S.log.batches[m];
-  Object.keys(S.log[m] || {}).forEach(k => {
-    if (k === 'batches') return;
-    S.log[m][k] = flow(m, k).filter(f => f.b !== id);
-    if (!S.log[m][k].length) delete S.log[m][k];
+function delBatch(m,id){
+  S.log.batches[m]=bts(m).filter(b=>b.id!==id);
+  if(!S.log.batches[m].length)delete S.log.batches[m];
+  Object.keys(S.log[m]||{}).forEach(k=>{
+    if(k==='batches')return;
+    S.log[m][k]=flow(m,k).filter(f=>f.b!==id);
+    if(!S.log[m][k].length)delete S.log[m][k];
   });
 }
-const ensureB = () => {
-  if (bts(month).length) return curB();
-  return addBatch(month, new Date().toISOString().slice(0, 10), '');
-};
-function curB() {
-  if (bSel && bSel !== 'all' && bt(month, bSel)) return bSel;
-  const f = bts(month)[0];
-  return f ? f.id : 'all';
-}
 
-/* ===== 流水读写 ===== */
-function setQty(m, id, src, b, q, price) {
-  q = Math.max(0, q | 0);
-  const keep = flow(m, id).filter(f => !(inB(f, b) && f.src === src));
-  if (q > 0) keep.push({ b: b === 'all' ? 0 : b, src, qty: q, price: Math.max(0, num(price)) });
-  S.log[m] = S.log[m] || {};
-  S.log[m][id] = keep;
-  if (!keep.length) delete S.log[m][id];
+function touch(){
+  S.updated=new Date().toISOString();
+  status='保存中…';meta();clearTimeout(tm);tm=setTimeout(save,600);
 }
-function setPrice(m, id, src, b, price) {
-  const f = flow(m, id).find(f => inB(f, b) && f.src === src);
-  if (f) f.price = Math.max(0, num(price));
-}
-
-/* ===== 保存 ===== */
-function touch() {
-  S.updated = new Date().toISOString();
-  status = '保存中…'; meta(); clearTimeout(tm); tm = setTimeout(save, 600);
-}
-function save() {
-  try {
-    const { batches, rest } = splitLog(S.log);
-    localStorage.setItem(KEY, JSON.stringify(Object.assign({}, S, { log: rest, _batches: batches })));
-    status = '已保存';
-  } catch (e) {
-    status = '保存失败：' + (e && e.name === 'QuotaExceededError' ? '浏览器存储空间已满，请先导出备份' : '未知错误');
+function save(){
+  try{
+    const {batches,rest}=splitLog(S.log);
+    localStorage.setItem(KEY,JSON.stringify(Object.assign({},S,{log:rest,_batches:batches})));
+    status='已保存';
+  }catch(e){
+    status='保存失败：'+(e&&e.name==='QuotaExceededError'?'存储空间已满':'未知错误');
   }
   meta();
 }
-function meta() {
-  const t = S.updated ? new Date(S.updated).toLocaleString('zh-CN', { hour12: false }) : '尚无更新';
-  const cls = status.startsWith('保存失败') ? 'err' : (status === '已保存' ? 'ok' : '');
-  $('#meta').textContent = '数据仅存本机浏览器 · 更新于 ' + t;
-  const el = $('#status');
-  el.textContent = status || (S.products.length ? '' : '还没有烟品，先到「烟品目录」添加，再回来开烟。');
-  el.className = 'status' + (cls ? ' ' + cls : '');
+function meta(){
+  const t=S.updated?new Date(S.updated).toLocaleString('zh-CN',{hour12:false}):'尚无更新';
+  $('#meta').innerHTML='<span class="ok">编辑模式</span> · 更新于 '+t+
+    (status?' · <span class="'+(status.startsWith('保存失败')?'err':'')+'">'+status+'</span>':'')+
+    ' · <button data-act="export" style="padding:2px 8px;font-size:12px">导出备份</button>'+
+    ' <button data-act="import" style="padding:2px 8px;font-size:12px">导入恢复</button>'+
+    '<input type="file" id="impFile" accept="application/json,.json" style="display:none">';
 }
-function exportData() {
-  const { batches, rest } = splitLog(S.log);
-  const blob = new Blob([JSON.stringify(Object.assign({}, S, { log: rest, _batches: batches }), null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = '香烟进销记录-' + new Date().toISOString().slice(0, 10) + '.json';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+function exportData(){
+  const {batches,rest}=splitLog(S.log);
+  const blob=new Blob([JSON.stringify(Object.assign({},S,{log:rest,_batches:batches}),null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='香烟进销记录-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
-function importData(file) {
-  const r = new FileReader();
-  r.onload = () => {
-    try {
-      const d = JSON.parse(r.result);
-      if (!d || !Array.isArray(d.products) || typeof d.log !== 'object') throw new Error('文件格式不对');
-      if (!confirm('导入将覆盖当前全部数据，确定继续？')) return;
-      S = d;
-      if (S._batches) { S.log.batches = S._batches; delete S._batches; }
-      migrate(); save(); closeAll(); render();
-    } catch (e) { alert('导入失败：' + e.message); }
+function importData(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d||!Array.isArray(d.products)||typeof d.log!=='object')throw new Error('格式不对');
+      if(!confirm('导入将覆盖当前全部数据，确定继续？'))return;
+      S=d;
+      if(S._batches){S.log.batches=S._batches;delete S._batches}
+      migrate();save();render();alert('导入成功');
+    }catch(e){alert('导入失败：'+e.message)}
   };
   r.readAsText(file);
 }
+function tabs(){
+  return '<div class="tabs">'+[['log','月度开烟'],['sum','汇总对比'],['prod','烟品目录']].map(([k,n])=>'<button data-act="tab" data-v="'+k+'" class="'+(tab===k?'on':'')+'">'+n+'</button>').join('')+'</div>';
+}
 
-/* ===== 视图：月度开烟 ===== */
-function viewLog() {
-  const rows = S.products.filter(p => p.status !== '停供' || qty(month, p.id));
-  const tot = rows.reduce((a, p) => {
-    const n = qty(month, p.id);
-    a.n += n; a.c += costOf(month, p.id); a.r += n * p.retail * 10; a.f += n * flagOf(p);
-    return a;
-  }, { n: 0, c: 0, r: 0, f: 0 });
-  const mx = Math.max(1, ...rows.map(p => qty(month, p.id)));
-  const B = bts(month), cur = bt(month, bSel);
-  if (bSel !== 'all' && !cur) bSel = 'all';
+function setQty(m,id,src,b,q,price){
+  q=Math.max(0,q|0);
+  const keep=flow(m,id).filter(f=>!(inB(f,b)&&f.src===src));
+  if(q>0)keep.push({b:b==='all'?0:b,src,qty:q,price:Math.max(0,num(price))});
+  S.log[m]=S.log[m]||{};
+  S.log[m][id]=keep;
+  if(!keep.length)delete S.log[m][id];
+}
+function setPrice(m,id,src,b,price){
+  const f=flow(m,id).find(f=>inB(f,b)&&f.src===src);
+  if(f)f.price=Math.max(0,num(price));
+}
 
-  let h = '<input type="month" id="mo" value="' + month + '">';
-
-  /* 批次区 */
-  h += '<div class="card"><div class="row"><b>本月开烟批次</b>' +
-    '<button class="btn sm" data-act="newB">＋ 新增开烟</button></div>' +
-    '<div class="mu" style="margin-top:6px">先建批次，再点下方「＋ 录入本次开烟」选烟品填数量。</div>';
-  if (B.length) {
-    h += '<div class="mu" style="margin-top:8px">' + B.map(b => '第' + b.id + '次 <span style="color:#60a5fa">' + (b.date ? b.date.slice(5).replace('-', '/') : '—') + '</span> ' + btQty(month, b.id) + ' 条').join(' ｜ ') + '</div>' +
-      '<div style="margin-top:8px">' + B.map(b => {
-        const q = btQty(month, b.id);
-        return '<div class="bitem"><span class="no">' + b.id + '</span>' +
-          '<span class="dt">' + (b.date ? b.date.slice(5).replace('-', '/') + ' 日' : '未填日期') + '</span>' +
-          '<span class="nt">' + (b.note ? esc(b.note) : '<span class="mu">无备注</span>') + '</span>' +
-          '<span class="q">' + q + ' 条</span>' +
-          '<button class="btn ghost sm" data-act="editB" data-v="' + b.id + '">编辑</button>' +
-          '<button class="btn ghost sm" data-act="delB" data-v="' + b.id + '">' + (bDel === b.id ? '再点确认' : '删除') + '</button></div>';
-      }).join('') + '</div>';
-  } else {
-    h += '<div class="mu" style="margin-top:8px;color:#f59e0b">还没有批次，点右上「＋ 新增开烟」建第 1 次。</div>';
-  }
-  if (bEdit) {
-    const nb = bEdit === 'new' ? { date: new Date().toISOString().slice(0, 10), note: '' } : bt(month, bEdit);
-    h += '<div style="border-top:1px dashed #2a2f38;margin-top:10px;padding-top:10px;display:grid;gap:8px">' +
-      '<div><span class="mu">开烟日期</span><input id="b_date" type="date" value="' + esc(nb.date) + '"></div>' +
-      '<div><span class="mu">备注（常规投放 / 补货 / 节前投放）</span><input id="b_note" placeholder="选填" value="' + esc(nb.note) + '"></div>' +
-      '<div class="row"><button class="btn ghost sm" data-act="cancelB">取消</button><button class="btn sm" data-act="saveB">确定</button></div></div>';
-  }
-  h += '</div>';
-
-  /* KPI */
-  h += '<div class="kpi-row">' +
-    kpi('本月开烟（条）', tot.n) + kpi('进货成本（元）', fmt(tot.c)) + kpi('按建议价销售额', fmt(tot.r)) +
-    kpi('理论毛利', fmt(tot.r - tot.c), tot.r - tot.c) + kpi('红旗售价销售额', fmt(tot.f)) +
-    kpi('实际利润', fmt(tot.f - tot.c), tot.f - tot.c) + '</div>';
-
-  /* 批次切换 + 录入入口 */
-  if (B.length) {
-    h += '<div class="chips">' +
-      '<button class="chip' + (bSel === 'all' ? ' on' : '') + '" data-act="selB" data-v="all">全部（' + btQty(month, 'all') + ' 条）</button>' +
-      B.map(b => '<button class="chip' + (bSel === b.id ? ' on' : '') + '" data-act="selB" data-v="' + b.id + '">第' + b.id + '次 · ' + (b.date ? b.date.slice(5).replace('-', '/') : '—') + ' · ' + btQty(month, b.id) + ' 条</button>').join('') +
-      '</div>';
-    if (bSel !== 'all' && cur) {
-      const c = btCost(month, bSel), f = btFlag(month, bSel);
-      h += '<div class="card" style="padding:12px"><div class="mu">第' + bSel + '次 · ' + (cur.date || '未填日期') + (cur.note ? ' · ' + esc(cur.note) : '') +
-        '　成本 <b style="color:#fff">' + fmt(c) + '</b> · 红旗销售额 <b style="color:#fff">' + fmt(f) + '</b> · 利润 <b class="' + (f - c >= 0 ? 'green' : 'red') + '">' + fmt(f - c) + '</b> 元</div></div>';
+function pickPanel(){
+  if(!pick.open)return '';
+  const curBid=(bSel!=='all'&&bt(month,bSel))?bSel:(bts(month)[0]||{}).id;
+  const bno=curBid?'第'+curBid+'次':'未选批次';
+  let h='<div class="card"><div class="row"><b>录入本次开烟 · '+bno+'</b><button data-act="closePick" style="padding:3px 8px;font-size:12px">关闭</button></div>';
+  if(pick.pid){
+    const p=P(pick.pid);
+    h+='<div class="row" style="margin-top:8px"><b>'+esc(p.name)+'</b><button data-act="repick" style="padding:3px 8px;font-size:12px">更换</button></div>'+
+      '<div class="srcs">'+
+      srcRow('t','烟草',month,p,curBid,bqtyOf(month,p.id,curBid,'t'))+
+      srcRow('d','烟贩',month,p,curBid,bqtyOf(month,p.id,curBid,'d'))+
+      '</div>'+
+      '<div class="row" style="margin-top:8px"><button data-act="repick">继续录下一款</button><button class="on" data-act="closePick">完成</button></div>';
+  }else{
+    const kw=pick.q.trim().toLowerCase();
+    const list=S.products.filter(p=>p.status!=='停供'&&(!kw||p.name.toLowerCase().includes(kw)));
+    h+='<div style="margin-top:8px"><input id="pk_q" placeholder="输入关键词搜索烟品…" value="'+esc(pick.q)+'" autocomplete="off"></div>';
+    if(!S.products.filter(p=>p.status!=='停供').length){
+      h+='<div class="mu" style="margin-top:8px">还没有烟品。先到「烟品目录」添加。</div>';
+    }else if(!list.length){
+      h+='<div class="mu" style="margin-top:8px">没找到「'+esc(pick.q)+'」，换个关键词，或到烟品目录新增。</div>';
+    }else{
+      h+='<div class="pick">'+list.slice(0,8).map(p=>
+        '<div class="bitem" data-act="pick" data-v="'+p.id+'"><span class="no">'+esc(p.name.slice(0,2))+'</span>'+
+        '<span class="nt">'+esc(p.name)+'</span>'+
+        '<span class="q">烟草 '+fmt(p.cost)+(p.cost2?' · 烟贩 '+fmt(p.cost2):'')+'</span></div>'
+      ).join('')+'</div>';
+      if(list.length>8)h+='<div class="mu" style="margin-top:6px">还有 '+(list.length-8)+' 条，继续输入关键词缩小范围。</div>';
     }
-    h += '<button class="btn" style="width:100%;margin-bottom:12px" data-act="openEntry">＋ 录入本次开烟</button>';
+  }
+  return h+'</div>';
+}
+
+function viewLog(){
+  const rows=S.products.filter(p=>p.status!=='停供'||qty(month,p.id));
+  const tot=rows.reduce((a,p)=>{
+    const n=qty(month,p.id);
+    a.n+=n;a.c+=costOf(month,p.id);a.r+=n*p.retail*10;a.f+=n*flagOf(p);
+    return a;
+  },{n:0,c:0,r:0,f:0});
+  const mx=Math.max(1,...rows.map(p=>qty(month,p.id)));
+  const B=bts(month),cur=bt(month,bSel);
+  if(bSel!=='all'&&!cur)bSel='all';
+  let h='<input type="month" id="mo" value="'+month+'">';
+
+  h+='<div class="bh"><div class="row"><b>本月开烟批次</b>'+
+    '<button data-act="newB" style="padding:4px 10px;font-size:12px">＋ 新增开烟</button></div>';
+  if(B.length){
+    h+='<div class="btot">'+B.map(b=>'第'+b.id+'次 <i>'+(b.date?b.date.slice(5).replace('-','/'):'—')+'</i> '+btQty(month,b.id)+' 条').join('<i>|</i>')+'</div>';
+    h+='<div class="blist">'+B.map(b=>{
+      const q=btQty(month,b.id);
+      return '<div class="bitem"><span class="no">'+b.id+'</span>'+
+        '<span class="dt">'+(b.date?b.date.slice(5).replace('-','/')+' 日':'未填日期')+'</span>'+
+        '<span class="nt">'+(b.note?esc(b.note):'<span class="mu">无备注</span>')+'</span>'+
+        '<span class="q">'+q+' 条</span>'+
+        '<button data-act="editB" data-v="'+b.id+'">编辑</button><button data-act="delB" data-v="'+b.id+'">'+(bDel===b.id?'再点确认':'删除')+'</button></div>';
+    }).join('')+'</div>';
+    h+='<button data-act="openPick" style="width:100%;margin-top:8px">＋ 录入本次开烟</button>';
+  }else{
+    h+='<div class="mu">还没有批次，点右上「＋ 新增开烟」建第 1 次。</div>';
+  }
+  if(bEdit){
+    const nb=bEdit==='new'?{date:new Date().toISOString().slice(0,10),note:''}:bt(month,bEdit);
+    h+='<div class="bform">'+
+      '<div><span class="mu">开烟日期</span><input id="b_date" type="date" value="'+esc(nb.date)+'"></div>'+
+      '<div><span class="mu">备注（如 常规投放 / 补货 / 节前投放）</span><input id="b_note" placeholder="选填" value="'+esc(nb.note)+'"></div>'+
+      '<div class="row"><button data-act="cancelB">取消</button><button class="on" data-act="saveB">确定</button></div></div>';
+  }
+  h+='</div>';
+
+  h+=pickPanel();
+
+  h+='<div class="kpi">'+
+    '<div><span class="mu">本月开烟（条）</span><b>'+tot.n+'</b></div>'+
+    '<div><span class="mu">进货成本（元）</span><b>'+fmt(tot.c)+'</b></div>'+
+    '<div><span class="mu">按建议价销售额</span><b>'+fmt(tot.r)+'</b></div>'+
+    '<div><span class="mu">理论毛利</span><b class="'+(tot.r-tot.c>=0?'ok':'err')+'">'+fmt(tot.r-tot.c)+'</b></div>'+
+    '<div><span class="mu">红旗售价销售额</span><b>'+fmt(tot.f)+'</b></div>'+
+    '<div><span class="mu">实际利润</span><b class="'+(tot.f-tot.c>=0?'ok':'err')+'">'+fmt(tot.f-tot.c)+'</b></div>'+
+    '</div>';
+
+  if(B.length){
+    h+='<div class="chips">'+
+      '<button class="chip'+(bSel==='all'?' on':'')+'" data-act="selB" data-v="all">全部（'+btQty(month,'all')+' 条）</button>'+
+      B.map(b=>'<button class="chip'+(bSel===b.id?' on':'')+'" data-act="selB" data-v="'+b.id+'">第'+b.id+'次 · '+(b.date?b.date.slice(5).replace('-','/'):'—')+' · <b>'+btQty(month,b.id)+'</b> 条</button>').join('')+
+      '</div>';
+    if(bSel!=='all'&&cur){
+      const c=btCost(month,bSel),f=btFlag(month,bSel);
+      h+='<div class="card" style="padding:8px 10px"><div class="mu">第'+bSel+'次开烟 · '+(cur.date||'未填日期')+(cur.note?' · '+esc(cur.note):'')+'</div>'+
+        '<div class="mu">成本 <b>'+fmt(c)+'</b> 元 · 红旗销售额 <b>'+fmt(f)+'</b> 元 · 利润 <b class="'+(f-c>=0?'ok':'err')+'">'+fmt(f-c)+'</b> 元</div></div>';
+    }
   }
 
-  /* 录入面板 */
-  if (picking && B.length) h += entryForm();
-
-  /* 烟品卡片 */
-  if (!rows.length) {
-    h += '<div class="card empty">' + (S.products.length ? '本月没有「在售」烟品。' : '还没有烟品。到「烟品目录」添加后，回来点 ＋ 录入。') + '</div>';
-  }
-  const sb = bSel;
-  rows.forEach(p => {
-    const n = qty(month, p.id), bn = bqty(month, p.id, sb), showing = sb !== 'all';
-    let body = '';
-    if (B.length) {
-      body = '<div class="srcs">' +
-        srcRow('t', '烟草', month, p, sb, bqtyOf(month, p.id, sb, 't')) +
-        srcRow('d', '烟贩', month, p, sb, bqtyOf(month, p.id, sb, 'd')) +
-        (bn ? '<div class="mu" style="text-align:right">' + (showing ? '本批 ' : '') + '成本 ' + fmt(bcost(month, p.id, sb)) + ' 元 · 红旗销售额 ' + fmt0(bn * flagOf(p)) + ' 元 · 利润 <span class="' + (bn * flagOf(p) - bcost(month, p.id, sb) >= 0 ? 'green' : 'red') + '">' + fmt0(bn * flagOf(p) - bcost(month, p.id, sb)) + '</span> 元' +
-          (showing && n ? '　｜　月累计 ' + n + ' 条 / ' + fmt0(costOf(month, p.id)) + ' 元' : '') + '</div>' : '') +
+  if(!rows.length)h+='<div class="card mu">还没有在售烟品。到「烟品目录」添加后，回来点 ＋ 录入。</div>';
+  const sb=bSel;
+  rows.forEach(p=>{
+    const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
+    let body='';
+    if(editor){
+      body='<div class="srcs">'+
+        srcRow('t','烟草',month,p,sb,bqtyOf(month,p.id,sb,'t'))+
+        srcRow('d','烟贩',month,p,sb,bqtyOf(month,p.id,sb,'d'))+
+        (bn?'<div class="sum">'+(showing?'本批 ':'')+'成本 '+fmt(bcost(month,p.id,sb))+' 元 · 红旗销售额 '+fmt0(bn*flagOf(p))+' 元 · 利润 <span class="'+(bn*flagOf(p)-bcost(month,p.id,sb)>=0?'ok':'err')+'">'+fmt0(bn*flagOf(p)-bcost(month,p.id,sb))+'</span> 元'+
+          (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
         '</div>';
     }
-    const disp = showing ? bn : n;
-    h += '<div class="card"><div class="row"><div><h3 style="margin:0">' + esc(p.name) + (p.status !== '在售' ? '<span class="tag">' + p.status + '</span>' : '') +
-      '</h3><p>' + fmt(p.cost) + '/条' + (p.cost2 ? ' · 烟贩 ' + fmt(p.cost2) + '/条' : '') + ' · 建议 ' + fmt(p.retail) + '/包 · 红旗 ' + fmt(flagOf(p)) + '/条</p></div>' +
-      (B.length ? '' : '<b style="font-size:18px">' + (showing ? bn + ' <span class="mu">/ 月 ' + n + '</span>' : n + ' 条') + '</b>') + '</div>' +
-      body + (disp ? '<div class="bar" style="width:' + (disp / mx * 100) + '%"></div>' : '') + '</div>';
+    const disp=showing?bn:n;
+    h+='<div class="card"><div class="row"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+
+    '<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
+    (editor?'':'<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b>')+'</div>'+
+    body+(disp?'<div class="bar" style="width:'+(disp/mx*100)+'%"></div>':'')+'</div>';
   });
-  h += '<div class="mu" style="margin-top:12px">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计，销售额按进货量估算，未计入未售库存。' +
-    (B.length ? '加减按钮直接作用于当前批次，同批次内货源与单价相同时自动合并条数。' : '') + '</div>';
-  return h;
+  return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。</div>';
 }
-function kpi(label, val, cmp) {
-  const cls = cmp === undefined ? '' : (cmp >= 0 ? 'green' : 'red');
-  return '<div class="kpi"><div class="label">' + label + '</div><div class="value ' + cls + '">' + val + '</div></div>';
-}
-function srcRow(src, label, m, p, b, q) {
-  const pr = bpriceOf(m, p.id, b, src);
-  const ph = src === 't' ? p.cost : (p.cost2 || p.cost);
-  return '<div class="src ' + (q ? '' : 'off') + '">' +
-    '<span class="nm ' + src + '">' + label + '</span>' +
-    '<span class="step"><button data-act="dec" data-src="' + src + '" data-v="' + p.id + '">−</button><b>' + q + '</b><button data-act="inc" data-src="' + src + '" data-v="' + p.id + '">+</button></span>' +
-    (q ? '<span class="pr"><span>@</span><input type="number" step="0.1" min="0" placeholder="' + fmt(ph) + '" value="' + pr + '" data-act="price" data-src="' + src + '" data-v="' + p.id + '"></span>'
-       : '<span class="pr mu">点 + 添加</span>') +
+function srcRow(src,label,m,p,b,q){
+  const pr=bpriceOf(m,p.id,b,src);
+  const ph=src==='t'?p.cost:(p.cost2||p.cost);
+  return '<div class="src '+(q?'':'off')+'">'+
+    '<span class="nm '+src+'">'+label+'</span>'+
+    '<span class="step"><button data-act="dec" data-src="'+src+'" data-v="'+p.id+'">−</button><b>'+q+'</b><button data-act="inc" data-src="'+src+'" data-v="'+p.id+'">+</button></span>'+
+    (q?'<span class="pr"><span>@</span><input type="number" step="0.1" min="0" placeholder="'+fmt(ph)+'" value="'+pr+'" data-act="price" data-src="'+src+'" data-v="'+p.id+'"></span>':'<span class="pr mu">点 + 添加</span>')+
     '</div>';
 }
 
-/* ===== 关键词搜索录入 ===== */
-function entryForm() {
-  let h = '<div class="card" style="border-color:#2563eb"><b>录入本次开烟</b><div class="mu">第' + curB() + '次 · ' +
-    (bt(month, curB()).date || '未填日期') + '</div><div style="margin-top:10px">';
-
-  if (!entry) {
-    h += '<div class="pick"><input type="text" id="pickKw" placeholder="输入关键词搜索烟品，如 软蓝 / 黄鹤楼" value="' + esc(pickKw) + '" autocomplete="off">' +
-      '<div class="picklist">' + pickList() + '</div></div>';
-  } else {
-    const p = P(entry);
-    h += '<div class="chosen"><div><b>' + esc(p.name) + '</b><div class="mu">' + fmt(p.cost) + '/条' +
-      (p.cost2 ? ' · 烟贩 ' + fmt(p.cost2) + '/条' : '') + ' · 红旗 ' + fmt(flagOf(p)) + '/条</div></div>' +
-      '<button class="btn ghost sm" data-act="rePick">更换</button></div>' +
-      '<div class="srcs" style="border-top:none;padding-top:6px">' +
-      srcRow('t', '烟草', month, p, curB(), bqtyOf(month, entry, curB(), 't')) +
-      srcRow('d', '烟贩', month, p, curB(), bqtyOf(month, entry, curB(), 'd')) +
-      '</div>' +
-      '<div class="mu" style="margin-top:8px">数量已直接写入第' + curB() + '次；单价可改，只影响本次流水。</div>' +
-      '<div class="row" style="margin-top:10px"><button class="btn ghost sm" data-act="doneEntry">完成</button>' +
-      '<button class="btn sm" data-act="nextEntry">继续录下一款</button></div>';
-  }
-  return h + '</div></div>';
-}
-function pickList() {
-  const kw = pickKw.trim().toLowerCase();
-  let list = S.products.filter(p => p.status !== '停供');
-  if (kw) list = list.filter(p => p.name.toLowerCase().includes(kw));
-  if (!S.products.length) return '<div class="empty" style="padding:18px 0">烟品目录还是空的，先去添加</div>';
-  if (!list.length) return '<div class="empty" style="padding:18px 0">没找到「' + esc(pickKw.trim()) + '」，换个关键词，或到烟品目录新增</div>';
-  const show = list.slice(0, 8);
-  return show.map(p => {
-    return '<div class="pickitem" data-act="pick" data-v="' + p.id + '"><b>' + esc(p.name) + '</b><div class="mu">' + fmt(p.cost) + '/条' +
-      (p.cost2 ? ' · 烟贩 ' + fmt(p.cost2) + '/条' : '') + (p.status !== '在售' ? ' · ' + p.status : '') + '</div></div>';
-  }).join('') + (list.length > 8 ? '<div class="empty" style="padding:10px 0">还有 ' + (list.length - 8) + ' 条，继续输入关键词缩小范围</div>' : '');
-}
-
-/* ===== 视图：汇总 ===== */
-function viewSum() {
-  const ms = months().filter(m => Object.keys(S.log[m]).length).sort().reverse().slice(0, 12);
-  if (!ms.length) return '<div class="card empty">还没有月度记录。</div>';
-  let h = '<div class="scroll"><table><tr><th>烟品（条）</th>' + ms.map(m => '<th>' + m.slice(2) + '</th>').join('') + '<th>合计</th></tr>';
-  S.products.forEach(p => {
-    const v = ms.map(m => qty(m, p.id)), s = v.reduce((a, b) => a + b, 0);
-    if (s) h += '<tr><td>' + esc(p.name) + '</td>' + v.map(x => '<td>' + (x || '·') + '</td>').join('') + '<td><b>' + s + '</b></td></tr>';
+function viewSum(){
+  const ms=months().filter(m=>Object.keys(S.log[m]).length).sort().reverse().slice(0,12);
+  if(!ms.length)return '<div class="card mu">还没有月度记录。</div>';
+  let h='<div class="scroll"><table><tr><th>烟品（条）</th>'+ms.map(m=>'<th>'+m.slice(2)+'</th>').join('')+'<th>合计</th></tr>';
+  S.products.forEach(p=>{
+    const v=ms.map(m=>qty(m,p.id));const s=v.reduce((a,b)=>a+b,0);
+    if(s)h+='<tr><td>'+esc(p.name)+'</td>'+v.map(x=>'<td>'+(x||'·')+'</td>').join('')+'<td><b>'+s+'</b></td></tr>';
   });
-  const mt = ms.map(m => S.products.reduce((a, p) => a + qty(m, p.id), 0));
-  const mc = ms.map(m => S.products.reduce((a, p) => a + costOf(m, p.id), 0));
-  const mf = ms.map(m => S.products.reduce((a, p) => a + qty(m, p.id) * flagOf(p), 0));
-  const sum = a => a.reduce((x, y) => x + y, 0);
-  h += '<tr><td><b>当月合计</b></td>' + mt.map(x => '<td><b>' + x + '</b></td>').join('') + '<td><b>' + sum(mt) + '</b></td></tr>';
-  h += '<tr><td>进货成本</td>' + mc.map(x => '<td>' + fmt0(x) + '</td>').join('') + '<td>' + fmt0(sum(mc)) + '</td></tr>';
-  h += '<tr><td>红旗销售额</td>' + mf.map(x => '<td>' + fmt0(x) + '</td>').join('') + '<td>' + fmt0(sum(mf)) + '</td></tr>';
-  h += '<tr><td>实际利润</td>' + mf.map((x, i) => '<td class="' + (x - mc[i] >= 0 ? 'green' : 'red') + '">' + fmt0(x - mc[i]) + '</td>').join('') +
-    '<td class="' + (sum(mf) - sum(mc) >= 0 ? 'green' : 'red') + '">' + fmt0(sum(mf) - sum(mc)) + '</td></tr>';
-  h += '</table></div><div class="mu" style="margin-top:10px">显示最近 12 个有记录的月份，金额单位为元，按各月实际进货单价计算。</div>';
-  return h;
+  const mt=ms.map(m=>S.products.reduce((a,p)=>a+qty(m,p.id),0));
+  const mc=ms.map(m=>S.products.reduce((a,p)=>a+costOf(m,p.id),0));
+  const mf=ms.map(m=>S.products.reduce((a,p)=>a+qty(m,p.id)*flagOf(p),0));
+  h+='<tr><td><b>当月合计</b></td>'+mt.map(x=>'<td><b>'+x+'</b></td>').join('')+'<td><b>'+mt.reduce((a,b)=>a+b,0)+'</b></td></tr>';
+  h+='<tr><td>进货成本</td>'+mc.map(x=>'<td>'+fmt0(x)+'</td>').join('')+'<td>'+fmt0(mc.reduce((a,b)=>a+b,0))+'</td></tr>';
+  h+='<tr><td>红旗销售额</td>'+mf.map(x=>'<td>'+fmt0(x)+'</td>').join('')+'<td>'+fmt0(mf.reduce((a,b)=>a+b,0))+'</td></tr>';
+  h+='<tr><td>实际利润</td>'+mf.map((x,i)=>{const v=x-mc[i];return '<td class="'+(v>=0?'ok':'err')+'">'+fmt0(v)+'</td>'}).join('')+'<td class="'+(mf.reduce((a,b)=>a+b,0)-mc.reduce((a,b)=>a+b,0)>=0?'ok':'err')+'">'+fmt0(mf.reduce((a,b)=>a+b,0)-mc.reduce((a,b)=>a+b,0))+'</td></tr>';
+  h+='</table></div>';
+  return h+'<div class="mu" style="margin-top:8px">显示最近 12 个有记录的月份。金额单位为元，按各月实际进货单价计算。</div>';
 }
 
-/* ===== 视图：烟品目录 ===== */
-function viewProd() {
-  let h = '';
-  if (!edit) h += '<button class="btn" style="width:100%;margin-bottom:12px" data-act="new">＋ 添加烟品</button>';
-  if (edit) {
-    const p = edit === 'new' ? { name: '', cost: '', cost2: '', retail: '', actual: '', status: '在售', note: '' } : P(edit);
-    h += '<div class="card" style="border-color:#2563eb"><b>' + (edit === 'new' ? '添加烟品' : '编辑烟品') + '</b><div class="grid">' +
-      '<div class="full"><div class="field"><label>名称</label><input id="f_name" placeholder="如 黄鹤楼（软蓝）" value="' + esc(p.name) + '"></div></div>' +
-      '<div><div class="field"><label>烟草批发价（元/条）</label><input id="f_cost" type="number" step="0.1" min="0" value="' + esc(p.cost) + '"></div></div>' +
-      '<div><div class="field"><label>烟贩进货价（元/条）</label><input id="f_cost2" type="number" step="0.1" min="0" placeholder="选填" value="' + esc(p.cost2 || '') + '"></div></div>' +
-      '<div><div class="field"><label>建议零售价（元/包）</label><input id="f_retail" type="number" step="0.5" min="0" value="' + esc(p.retail) + '"></div></div>' +
-      '<div><div class="field"><label>红旗售价（元/条）</label><input id="f_actual" type="number" step="1" min="0" placeholder="选填" value="' + esc(p.actual || '') + '"></div></div>' +
-      '<div class="full"><div class="field"><label>货源状态</label><select id="f_status">' + ['在售', '紧缺', '停供'].map(s => '<option' + (p.status === s ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></div></div>' +
-      '<div class="full"><div class="field"><label>备注</label><input id="f_note" placeholder="选填" value="' + esc(p.note) + '"></div></div></div>' +
-      '<div class="row"><button class="btn ghost sm" data-act="cancel">取消</button><button class="btn sm" data-act="saveP">确定</button></div></div>';
+function viewProd(){
+  let h='';
+  if(!edit)h+='<button data-act="new" style="width:100%;margin-bottom:10px">＋ 添加烟品</button>';
+  if(edit){
+    const p=edit==='new'?{name:'',cost:'',cost2:'',retail:'',actual:'',status:'在售',note:''}:P(edit);
+    h+='<div class="card"><b>'+(edit==='new'?'添加烟品':'编辑烟品')+'</b><div class="grid">'+
+      '<div class="full"><input id="f_name" placeholder="名称，如 黄鹤楼（软蓝）" value="'+esc(p.name)+'"></div>'+
+      '<div><span class="mu">烟草批发价（元/条）</span><input id="f_cost" type="number" step="0.1" min="0" value="'+esc(p.cost)+'"></div>'+
+      '<div><span class="mu">烟贩进货价（元/条）</span><input id="f_cost2" type="number" step="0.1" min="0" placeholder="选填" value="'+esc(p.cost2||'')+'"></div>'+
+      '<div><span class="mu">建议零售价（元/包）</span><input id="f_retail" type="number" step="0.5" min="0" value="'+esc(p.retail)+'"></div>'+
+      '<div><span class="mu">红旗售价（元/条）</span><input id="f_actual" type="number" step="1" min="0" placeholder="选填" value="'+esc(p.actual||'')+'"></div>'+
+      '<div class="full"><span class="mu">货源状态</span><select id="f_status">'+['在售','紧缺','停供'].map(s=>'<option'+(p.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'+
+      '<div class="full"><input id="f_note" placeholder="备注，如 本月投放减少" value="'+esc(p.note)+'"></div></div>'+
+      '<div class="row"><button data-act="cancel">取消</button><button class="on" data-act="saveP">确定</button></div></div>';
   }
-  if (!S.products.length && !edit) {
-    h += '<div class="card empty">还没有烟品，点上方按钮添加第一款。</div>';
-  }
-  S.products.forEach(p => {
-    const m = p.retail * 10 - p.cost;
-    h += '<div class="card"><div class="row"><h3 style="margin:0">' + esc(p.name) +
-      ' <span class="tag' + (p.status === '在售' ? ' ok' : '') + '">' + p.status + '</span></h3>' +
-      '<span><button class="btn ghost sm" data-act="edit" data-v="' + p.id + '">编辑</button> ' +
-      '<button class="btn ghost sm" data-act="del" data-v="' + p.id + '">' + (delId === p.id ? '再点确认' : '删除') + '</button></span></div>' +
-      '<p>' + fmt(p.cost) + '/条' + (p.cost2 ? ' · 烟贩 ' + fmt(p.cost2) + '/条' : '') + ' · 建议零售 ' + fmt(p.retail) + '/包（' + fmt(p.retail * 10) + '/条）· 红旗 ' + fmt(flagOf(p)) + '/条</p>' +
-      '<div class="mu">建议价毛利 ' + fmt(m) + '/条' + (p.actual ? ' · 红旗毛利 <span class="' + (p.actual - p.cost >= 0 ? 'green' : 'red') + '">' + fmt(p.actual - p.cost) + '</span>/条' : ' · 未填红旗售价') + '</div>' +
-      (p.note ? '<div class="mu" style="color:#5c6472;margin-top:4px">' + esc(p.note) + '</div>' : '') + '</div>';
+  S.products.forEach(p=>{
+    const m=p.retail*10-p.cost;
+    h+='<div class="card"><div class="row"><b>'+esc(p.name)+' <span class="tag'+(p.status!=='在售'?' warn':'')+'">'+p.status+'</span></b>'+
+    '<span><button data-act="edit" data-v="'+p.id+'">编辑</button> <button data-act="del" data-v="'+p.id+'">'+(delId===p.id?'再点确认':'删除')+'</button></span></div>'+
+    '<div class="mu">烟草 '+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议零售 '+fmt(p.retail)+'/包（'+fmt(p.retail*10)+'/条）· 红旗 '+fmt(flagOf(p))+'/条</div>'+
+    '<div class="mu">建议价毛利 '+fmt(m)+'/条'+(p.actual?' · 红旗毛利 <span class="'+(p.actual-p.cost>=0?'ok':'err')+'">'+fmt(p.actual-p.cost)+'</span>/条':'')+'</div>'+
+    (p.note?'<div class="badge">'+esc(p.note)+'</div>':'')+'</div>';
   });
-  h += '<div class="mu">删除会同时清掉该烟的历史流水，一般建议改为「停供」。</div>';
-  return h;
+  return h+'<div class="mu">删除会同时清除该烟的历史流水，一般建议改为「停供」。</div>';
 }
 
-/* ===== 渲染 ===== */
-function render() {
+function render(){
   meta();
-  $('#app').innerHTML = (tab === 'log' ? viewLog() : tab === 'sum' ? viewSum() : viewProd());
-  const kw = $('#pickKw');
-  if (kw) { kw.focus(); kw.setSelectionRange(kw.value.length, kw.value.length); }
+  $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
+  if(pick.open&&!pick.pid){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
 }
-function closeAll() { picking = false; entry = null; pickKw = ''; bEdit = null; edit = null; }
 
-/* ===== 事件 ===== */
-document.addEventListener('input', e => {
-  if (e.target.id === 'pickKw') { pickKw = e.target.value; render(); }
+document.addEventListener('input',e=>{
+  if(e.target.id==='pk_q'){pick.q=e.target.value;render()}
 });
-document.addEventListener('change', e => {
-  const t = e.target;
-  if (t.id === 'mo' && t.value) {
-    month = t.value; ss('month', month);
-    bSel = ss('bsel_' + month) || 'all';
-    closeAll(); render(); return;
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='mo'&&t.value){
+    month=t.value;ss('month',month);bSel=ss('bsel_'+month)||'all';
+    bEdit=null;bDel=null;edit=null;pick={open:false,q:'',pid:null};
+    render();return;
   }
-  if (t.dataset && t.dataset.act === 'price') setPrice(month, t.dataset.v, t.dataset.src, curB(), t.value);
-  if (t.id === 'impFile' && t.files && t.files[0]) importData(t.files[0]);
+  if(t.dataset&&t.dataset.act==='price'){
+    setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value);touch();
+  }
+  if(t.id==='impFile'&&t.files&&t.files[0])importData(t.files[0]);
 });
-document.addEventListener('focusout', e => {
-  if (e.target.dataset && e.target.dataset.act === 'price') render();
+document.addEventListener('focusout',e=>{
+  if(e.target.dataset&&e.target.dataset.act==='price')render();
 });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && picking) { closeAll(); render(); }
-  if (e.target.id === 'pickKw' && e.key === 'Enter') {
-    const list = S.products.filter(p => p.status !== '停供' &&
-      (!pickKw.trim() || p.name.toLowerCase().includes(pickKw.trim().toLowerCase())));
-    if (list.length === 1) { entry = list[0].id; picking = true; render(); }
-  }
-});
-document.addEventListener('click', e => {
-  const b = e.target.closest('[data-act]');
-  if (!b) return;
-  const a = b.dataset.act, src = b.dataset.src;
-  let v = b.dataset.v;
-  if (v !== undefined && !isNaN(Number(v))) v = Number(v);
-
-  if (a === 'tab') { tab = v; ss('tab', v); closeAll(); render(); }
-  else if (a === 'selB') { bSel = v; ss('bsel_' + month, v); bEdit = null; bDel = null; closeAll(); render(); }
-  else if (a === 'export') exportData();
-  else if (a === 'import') $('#impFile').click();
-
-  /* 录入面板 */
-  else if (a === 'openEntry') { picking = true; entry = null; pickKw = ''; render(); }
-  else if (a === 'pick') { entry = v; picking = true; render(); }
-  else if (a === 'rePick') { entry = null; pickKw = ''; render(); }
-  else if (a === 'doneEntry' || a === 'nextEntry') {
-    if (a === 'nextEntry') { entry = null; pickKw = ''; render(); }
-    else { closeAll(); render(); }
-  }
-
-  /* 加减 */
-  else if (a === 'inc' || a === 'dec') {
-    const p = P(v); if (!p) return;
-    const bid = ensureB();
-    const s = src || 't';
-    const cur = bqtyOf(month, v, bid, s);
-    const next = a === 'inc' ? cur + 1 : cur - 1;
-    const ph = s === 'd' ? (p.cost2 || p.cost) : p.cost;
-    const before = bpriceOf(month, v, bid, s);
-    setQty(month, v, s, bid, next, before !== '' ? before : ph);
-    if (bSel !== bid) { bSel = bid; ss('bsel_' + month, bid); }
-    touch(); render();
-  }
-
-  /* 批次 */
-  else if (a === 'newB') { bEdit = 'new'; bDel = null; render(); }
-  else if (a === 'editB') { bEdit = v; bDel = null; render(); }
-  else if (a === 'cancelB') { bEdit = null; render(); }
-  else if (a === 'saveB') {
-    const d = $('#b_date').value || '', n = $('#b_note').value.trim();
-    if (bEdit === 'new') { const id = addBatch(month, d, n); bSel = id; ss('bsel_' + month, id); }
-    else { const x = bt(month, bEdit); if (x) { x.date = d; x.note = n; } bSel = bEdit; ss('bsel_' + month, bEdit); }
-    bEdit = null; touch(); render();
-  } else if (a === 'delB') {
-    if (bDel !== v) { bDel = v; render(); return; }
-    delBatch(month, v);
-    if (bSel === v || bSel === String(v)) bSel = 'all';
-    ss('bsel_' + month, bSel); bDel = null; touch(); render();
-  }
-
-  /* 烟品 */
-  else if (a === 'new') { edit = 'new'; render(); }
-  else if (a === 'edit') { edit = v; render(); }
-  else if (a === 'cancel') { edit = null; render(); }
-  else if (a === 'saveP') {
-    const name = $('#f_name').value.trim();
-    if (!name) { alert('名称不能为空'); return; }
-    const d = {
-      name,
-      cost: num($('#f_cost').value),
-      cost2: $('#f_cost2').value === '' ? 0 : num($('#f_cost2').value),
-      retail: num($('#f_retail').value),
-      actual: $('#f_actual').value === '' ? 0 : num($('#f_actual').value),
-      status: $('#f_status').value,
-      note: $('#f_note').value.trim()
-    };
-    if (edit === 'new') S.products.push(Object.assign({ id: 'p' + Date.now().toString(36) }, d));
-    else Object.assign(P(edit), d);
-    edit = null; touch(); render();
-  } else if (a === 'del') {
-    if (delId !== v) { delId = v; render(); return; }
-    S.products = S.products.filter(p => p.id !== v);
-    months().forEach(m => { delete S.log[m][v]; });
-    delId = null; touch(); render();
+document.addEventListener('keydown',e=>{
+  if(e.target.id==='pk_q'){
+    if(e.key==='Escape'){pick={open:false,q:'',pid:null};render()}
+    if(e.key==='Enter'){
+      const kw=pick.q.trim().toLowerCase();
+      const list=S.products.filter(p=>p.status!=='停供'&&(!kw||p.name.toLowerCase().includes(kw)));
+      if(list.length===1){pick.pid=list[0].id;pick.q='';render()}
+    }
   }
 });
 
-$('#exportBtn').onclick = exportData;
-$('#importBtn').onclick = () => $('#impFile').click();
+function curB(){
+  if(bSel&&bSel!=='all'&&bt(month,bSel))return bSel;
+  const f=bts(month)[0];
+  return f?f.id:'all';
+}
+function ensureB(){
+  if(bts(month).length)return curB();
+  return addBatch(month,new Date().toISOString().slice(0,10),'');
+}
 
-migrate();
-render();
-</script>
-</body>
-</html>
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||!b.dataset.act)return;
+  const a=b.dataset.act,src=b.dataset.src;
+  let v=b.dataset.v;
+  if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
+  if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null};render();return}
+  if(a==='selB'){bSel=v;ss('bsel_'+month,v);bEdit=null;bDel=null;render();return}
+  if(a==='export'){exportData();return}
+  if(a==='import'){$('#impFile').click();return}
+  if(a==='openPick'){pick={open:true,q:'',pid:null};bSel=curB();ss('bsel_'+month,bSel);render();return}
+  if(a==='closePick'){pick={open:false,q:'',pid:null};render();return}
+  if(a==='repick'){pick.pid=null;pick.q='';render
