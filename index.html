@@ -403,15 +403,23 @@ body+(disp?'<div class="bar" style="width:'+(disp/mx*100)+'%"></div>':'')+
   });
   return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。</div>';
 }
+
 function srcRow(src,label,m,p,b,q){
   const pr=bpriceOf(m,p.id,b,src);
   const ph=src==='t'?p.cost:(p.cost2||p.cost);
+  const locked=b==='all';
+
   return '<div class="src '+(q?'':'off')+'">'+
     '<span class="nm '+src+'">'+label+'</span>'+
-    '<span class="step"><button data-act="dec" data-src="'+src+'" data-v="'+p.id+'">−</button><b>'+q+'</b><button data-act="inc" data-src="'+src+'" data-v="'+p.id+'">+</button></span>'+
-    (q?'<span class="pr"><span>@</span><input type="number" step="0.1" min="0" placeholder="'+fmt(ph)+'" value="'+pr+'" data-act="price" data-src="'+src+'" data-v="'+p.id+'"></span>':'<span class="pr mu">点 + 添加</span>')+
+    '<span class="step">'+
+    '<button data-act="dec" data-src="'+src+'" data-v="'+p.id+'"'+(locked?' disabled':'')+'>−</button>'+
+    '<b>'+q+'</b>'+
+    '<button data-act="inc" data-src="'+src+'" data-v="'+p.id+'"'+(locked?' disabled':'')+'>+</button>'+
+    '</span>'+
+    (q?'<span class="pr"><span>@</span><input type="number" step="0.1" min="0" placeholder="'+fmt(ph)+'" value="'+pr+'" data-act="price" data-src="'+src+'" data-v="'+p.id+'"'+(locked?' disabled':'')+'></span>':'<span class="pr mu">点 + 添加</span>')+
     '</div>';
 }
+
 
 function viewSum(){
   const ms=months().filter(m=>Object.keys(S.log[m]).length).sort().reverse().slice(0,12);
@@ -489,8 +497,14 @@ document.addEventListener('change',e=>{
     render();return;
   }
   if(t.dataset&&t.dataset.act==='price'){
-    setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value);touch();
-  }
+    if(bSel==='all'){
+      alert('全部批次视图不能修改价格，请先选择具体批次。');
+      render();
+      return;
+    }
+    setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value);
+    touch();
+}
   if(t.id==='impFile'&&t.files&&t.files[0])importData(t.files[0]);
 });
 document.addEventListener('focusout',e=>{
@@ -526,11 +540,25 @@ document.addEventListener('click',e=>{
   if(a==='selB'){bSel=v;ss('bsel_'+month,v);bEdit=null;bDel=null;render();return}
   if(a==='export'){exportData();return}
   if(a==='import'){$('#impFile').click();return}
-  if(a==='openPick'){pick={open:true,q:'',pid:null};bSel=curB();ss('bsel_'+month,bSel);render();return}
+  if(a==='openPick'){
+    if(bSel==='all'){
+      alert('请先选择一个具体批次，再录入开烟记录。');
+      return;
+    }
+    pick={open:true,q:'',pid:null};
+    bSel=curB();
+    ss('bsel_'+month,bSel);
+    render();
+    return;
+}
   if(a==='closePick'){pick={open:false,q:'',pid:null};render();return}
   if(a==='repick'){pick.pid=null;pick.q='';render();return}
   if(a==='pick'){pick.pid=v;pick.q='';render();return}
   if(a==='inc'||a==='dec'){
+    if(bSel==='all'){
+      alert('当前是「全部批次」视图，请先选择具体批次再修改。');
+      return;
+    }
     const p=P(v);if(!p)return;
     const bid=ensureB(),s=src||'t';
     const cur=bqtyOf(month,v,bid,s);
