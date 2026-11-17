@@ -391,7 +391,6 @@ function viewLog(){
      (bn?'<div class="sum">'+(showing?'本批 ':'')+'成本 '+fmt(bcost(month,p.id,sb))+' 元 · 红旗销售额 '+fmt0(bn*flagOf(p))+' 元 · 利润 <span class="'+(bn*flagOf(p)-bcost(month,p.id,sb)>=0?'ok':'err')+'">'+fmt0(bn*flagOf(p)-bcost(month,p.id,sb))+'</span> 元'+
         (p.cost2?' · 烟贩价利润 <span class="'+(bn*(p.retail*10-p.cost2)>=0?'ok':'err')+'">'+fmt0(bn*(p.retail*10-p.cost2))+'</span> 元':'')+
         (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
-        (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
     '</div>';
     const disp=showing?bn:n;
     h+='<div class="card"><div class="row"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+
