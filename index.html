@@ -583,7 +583,7 @@ document.addEventListener('click',e=>{
     months().forEach(m=>{delete S.log[m][v]});
     delId=null;touch();render();
   }else if(a==='editCard'){
-    editor=true;
+    editor=!editor;
     render();
   }
   else if(a==='toggleEdit'){
