@@ -10,7 +10,15 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overscroll-behavior:none}
 body{background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px;max-width:720px;margin:0 auto;height:100%;overflow:hidden;display:flex;flex-direction:column}
-#app{flex:1;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+#app{
+  flex:1;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:8px;
+  padding-right:calc(6px + env(safe-area-inset-right,0px));
+  scrollbar-gutter:stable;
+}
 h1{font-size:20px;margin:0}
 .sub{color:var(--mu);font-size:12px;margin:2px 0 12px}
 .tabs{display:flex;gap:6px;margin-bottom:12px}
