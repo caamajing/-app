@@ -582,12 +582,11 @@ document.addEventListener('click',e=>{
     S.products=S.products.filter(p=>p.id!==v);
     months().forEach(m=>{delete S.log[m][v]});
     delId=null;touch();render();
+  }else if(a==='editCard'){
+    editor=true;
+    render();
   }
 });
-  else if(a==='editCard'){
-  editor=true;
-  render();
-}
 
 migrate();
 render();
