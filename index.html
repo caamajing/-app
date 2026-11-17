@@ -386,18 +386,20 @@ function viewLog(){
     const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
     let body='';
     if(editor){
-      body='<div class="srcs">'+
-        srcRow('t','烟草',month,p,sb,bqtyOf(month,p.id,sb,'t'))+
-        srcRow('d','烟贩',month,p,sb,bqtyOf(month,p.id,sb,'d'))+
-        (bn?'<div class="sum">'+(showing?'本批 ':'')+'成本 '+fmt(bcost(month,p.id,sb))+' 元 · 红旗销售额 '+fmt0(bn*flagOf(p))+' 元 · 利润 <span class="'+(bn*flagOf(p)-bcost(month,p.id,sb)>=0?'ok':'err')+'">'+fmt0(bn*flagOf(p)-bcost(month,p.id,sb))+'</span> 元'+
-          (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
-        '</div>';
-    }
+  body='<div class="srcs">'+
+    srcRow('t','烟草',month,p,sb,bqtyOf(month,p.id,sb,'t'))+
+    srcRow('d','烟贩',month,p,sb,bqtyOf(month,p.id,sb,'d'))+
+    (bn?'<div class="sum">'+(showing?'本批 ':'')+'成本 '+fmt(bcost(month,p.id,sb))+' 元 · 红旗销售额 '+fmt0(bn*flagOf(p))+' 元 · 利润 <span class="'+(bn*flagOf(p)-bcost(month,p.id,sb)>=0?'ok':'err')+'">'+fmt0(bn*flagOf(p)-bcost(month,p.id,sb))+'</span> 元'+
+      (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
+    '</div>';
+}
     const disp=showing?bn:n;
     h+='<div class="card"><div class="row"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+
-    '<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
-    (editor?'':'<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b>')+'</div>'+
-    body+(disp?'<div class="bar" style="width:'+(disp/mx*100)+'%"></div>':'')+'</div>';
+'<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
+'<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b></div>'+
+body+(disp?'<div class="bar" style="width:'+(disp/mx*100)+'%"></div>':'')+
+'<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 8px;font-size:12px">修改</button></div>'+
+'</div>';
   });
   return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。</div>';
 }
@@ -582,6 +584,10 @@ document.addEventListener('click',e=>{
     delId=null;touch();render();
   }
 });
+  else if(a==='editCard'){
+  editor=true;
+  render();
+}
 
 migrate();
 render();
