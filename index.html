@@ -137,7 +137,7 @@ const $=s=>document.querySelector(s);
 const KEY='ciglog_data_v2';
 const ss=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){}};
 const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=true,edit=null,delId=null,status='',tm;
+let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=false,edit=null,delId=null,status='',tm;
 let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null;
 let pick={open:false,q:'',pid:null};
 
@@ -586,6 +586,10 @@ document.addEventListener('click',e=>{
     editor=true;
     render();
   }
+  else if(a==='toggleEdit'){
+  editor=!editor;
+  render();
+  }  
 });
 
 migrate();
