@@ -618,6 +618,10 @@ document.addEventListener('click',e=>{
 
 migrate();
 render();
+  setTimeout(()=>{
+  const chip=$('#app .chip.on');
+  if(chip)chip.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+},50);
 </script>
 </body></html>
 
