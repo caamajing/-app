@@ -8,12 +8,14 @@
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;overscroll-behavior:none}
+html,body{margin:0;height:100%;overscroll-behavior:none;overflow-x:hidden}
 body{background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px;max-width:720px;margin:0 auto;height:100%;overflow:hidden;display:flex;flex-direction:column}
 #app{
   flex:1;
   overflow-y:auto;
+  overflow-x:hidden;          /* 关键：任何超宽子内容都不得把整页横向拖走 */
   overscroll-behavior-y:contain;
+  overscroll-behavior-x:contain;
   -webkit-overflow-scrolling:touch;
   padding-bottom:8px;
   padding-right:calc(6px + env(safe-area-inset-right,0px));
@@ -128,6 +130,19 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .btot{font-size:11px;color:var(--mu);margin-bottom:8px;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
 .btot::-webkit-scrollbar{display:none}
 .btot i{font-style:normal;color:var(--ac);margin:0 4px}
+/* ===== 特殊处置条目：折叠摘要 + 点击展开完整信息 ===== */
+.blist{min-width:0}
+.bitem{min-width:0;max-width:100%}
+.aitem{border:1px solid var(--ln);border-radius:10px;padding:8px 10px;font-size:12px;min-width:0;max-width:100%;background:var(--card)}
+.aitem.on{border-color:var(--ac)}
+.ahd{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0}
+.ahd .at{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ahd .av{flex:0 0 auto;font-variant-numeric:tabular-nums}
+.ahd .ar{flex:0 0 auto;font-size:11px;color:var(--mu)}
+.abd{border-top:1px dashed var(--ln);margin-top:8px;padding-top:8px;display:grid;gap:5px;min-width:0}
+.abd .kv{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;min-width:0}
+.abd .kv>span:last-child{text-align:right;word-break:break-all}
+.abd button{padding:4px 9px;font-size:12px;border-radius:7px}
 /* ===== 录入面板（复用已有视觉，仅控制滚动） ===== */
 .pick{max-height:40vh;overflow-y:auto;display:grid;gap:6px;margin-top:6px;overscroll-behavior:contain}
 .pick .bitem{cursor:pointer}
@@ -147,7 +162,7 @@ const MAX_QTY=99999,MAX_MONEY=99999999;
 const ss=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){}};
 const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=false,edit=null,delId=null,status='',tm;
-let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null,aEdit=null,aDel=null;
+let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null,aEdit=null,aDel=null,aOpen=null;
 let pick={open:false,q:'',pid:null,newProd:false,newName:''};
 
 function loadData(){
@@ -301,12 +316,23 @@ const flagOf=p=>p.actual||(p.retail*10);
 
 // ===== 特殊处置（还款 / 换烟贩）与烟贩价利润 =====
 const adjs=m=>(S.adjust&&S.adjust[m])||[];
-// 账面按红旗价卖了，实际只抵/换了 amount 元：差额就是要从估算利润里扣掉的
+// 账面按红旗价卖了，实际只抵/换了 amount 元
+// 差额 d = 账面 − 实际：d>0 利润少了（扣），d<0 紧俏烟卖得比账面还高（加）
 const adjImpact=m=>adjs(m).reduce((a,r)=>{
   const p=P(r.pid);
   const book=p?r.qty*flagOf(p):r.amount;
   return a+(book-r.amount);
 },0);
+function adjDeltaHTML(d){
+  if(Math.abs(d)<0.005)return '<span class="mu">持平</span>';
+  return d>0
+    ? '<span class="err">扣 '+fmt(d)+' 元</span>'
+    : '<span class="ok">加 '+fmt(-d)+' 元</span>';
+}
+function adjDeltaText(d){
+  if(Math.abs(d)<0.005)return '无影响';
+  return (d>0?'扣 ':'加 ')+fmt(Math.abs(d))+' 元';
+}
 // 只算从烟贩渠道（d）进的烟：红旗售价 - 当时实际进价
 const dProfit=m=>S.products.reduce((a,p)=>
   a+flow(m,p.id).filter(f=>f.src==='d').reduce((s,f)=>s+f.qty*(flagOf(p)-f.price),0),0);
@@ -388,7 +414,7 @@ function importData(file){
       S=d;S.adjust=S.adjust||{};
       if(S._batches){S.log.batches=S._batches;delete S._batches}
       migrate();sanitize();
-      edit=null;delId=null;editor=false;bEdit=null;bDel=null;aEdit=null;aDel=null;
+      edit=null;delId=null;editor=false;bEdit=null;bDel=null;aEdit=null;aDel=null;aOpen=null;
       bSel='all';ss('bsel_'+month,'all');
       pick={open:false,q:'',pid:null,newProd:false,newName:''};
       save();render();alert('导入成功'+(note?'（已完成兼容处理）':''));
@@ -537,35 +563,63 @@ function pickPanel(){
   return h+'</div>';
 }
 
+function adjForm(r){
+  const isNew=!r;
+  const init=r||{date:defaultBatchDate(),pid:(S.products[0]||{}).id||'',qty:'',amount:'',note:''};
+  return '<div class="bform" style="margin-top:8px">'+
+    '<div class="mu" style="font-size:12px;line-height:1.5">👇 下面「实际抵 / 换到」填<b>这笔一共抵了多少钱</b>（条数 × 每条抵的钱），<b>不是单条价</b>。留空则按烟草价自动算。</div>'+
+    '<div><span class="mu">日期（选填）</span><input id="a_date" type="date" value="'+esc(init.date||defaultBatchDate())+'"></div>'+
+    '<div><span class="mu">哪款烟</span><select id="a_pid">'+S.products.map(p=>'<option value="'+esc(p.id)+'"'+(p.id===init.pid?' selected':'')+'>'+esc(p.name)+'</option>').join('')+'</select></div>'+
+    '<div class="grid">'+
+      '<div><span class="mu">条数</span><input id="a_qty" type="number" min="0" step="1" placeholder="如 2" value="'+esc(init.qty)+'"></div>'+
+      '<div><span class="mu">实际抵 / 换到（元，填总额）</span><input id="a_amt" type="number" step="0.1" placeholder="如 2 条共 476" value="'+esc(init.amount===''?'':init.amount)+'"></div>'+
+    '</div>'+
+    '<div id="a_ref" class="mu"></div>'+
+    '<div><input id="a_note" placeholder="备注，如 还款 / 换现金 / 换烟倒挂 10 元" value="'+esc(init.note||'')+'"></div>'+
+    '<div class="row"><button data-act="adjCancel">取消</button><button class="on" data-act="adjSave">'+(isNew?'保存并继续录入':'保存修改')+'</button></div>'+
+  '</div>';
+}
 function viewAdj(){
   const list=adjs(month),imp=adjImpact(month);
   let h='<div class="card"><div class="row"><b>特殊处置 · 还款 / 换烟贩</b>'+
     '<button data-act="adjNew" style="padding:4px 10px;font-size:12px">＋ 记一笔</button></div>';
-  h+='<div class="mu" style="margin-top:4px">这些烟没按红旗价卖出去，而是抵了债或换给烟贩。本月 <b>'+list.length+'</b> 笔 · 共从估算利润扣 <b>'+fmt(imp)+'</b> 元</div>';
+  const impTxt=Math.abs(imp)<0.005
+    ? '对估算利润无影响'
+    : (imp>0?'共从估算利润扣 <b>'+fmt(imp)+'</b> 元':'共给估算利润加 <b>'+fmt(-imp)+'</b> 元');
+  h+='<div class="mu" style="margin-top:4px">这些烟没按红旗价卖出去，而是抵了债或换给烟贩。本月 <b>'+list.length+'</b> 笔 · '+impTxt+'</div>'+
+    '<div class="mu" style="margin-top:2px;font-size:11px">换出去的钱<b>低于</b>账面红旗价就<b>扣</b>利润；紧俏烟被高价收走、<b>高于</b>账面就反过来<b>加</b>利润。点条目可展开看全、修改或删除。</div>';
   if(!S.products.length)h+='<div class="mu" style="margin-top:6px">还没有烟品，先到「烟品目录」添加后才能记账。</div>';
   if(list.length){
     h+='<div class="blist" style="margin-top:8px">'+list.map(r=>{
-      const p=P(r.pid),book=p?r.qty*flagOf(p):r.amount;
-      return '<div class="bitem"><span class="dt">'+(r.date?r.date.slice(5).replace('-','/'):'—')+'</span>'+
-        '<span class="nt">'+esc(p?p.name:'（烟品已删除）')+' · '+r.qty+' 条'+(r.note?' · '+esc(r.note):'')+'</span>'+
-        '<span class="q">实际 '+fmt(r.amount)+' 元'+(r.qty>0?'（每条 '+fmt(r.amount/r.qty)+'）':'')+' · 扣 '+fmt(book-r.amount)+' 元</span>'+
-        '<button data-act="adjDel" data-v="'+r.id+'">'+(aDel===r.id?'再点确认':'删除')+'</button></div>';
+      const p=P(r.pid),book=p?r.qty*flagOf(p):r.amount,d=book-r.amount;
+      const open=aOpen===r.id,editing=aEdit===r.id;
+      let x='<div class="aitem'+(open?' on':'')+'">'+
+        '<div class="ahd" data-act="adjToggle" data-v="'+r.id+'">'+
+          '<span class="at"><b>'+esc(p?p.name:'（烟品已删除）')+'</b> · '+r.qty+' 条 · '+(r.date?r.date.slice(5).replace('-','/'):'—')+'</span>'+
+          '<span class="av">'+adjDeltaHTML(d)+'</span>'+
+          '<span class="ar">'+(open?'▴ 收起':'▾ 详情 / 修改')+'</span>'+
+        '</div>';
+      if(open){
+        x+='<div class="abd">'+
+          '<div class="kv"><span class="mu">实际抵 / 换到（总额）</span><b>'+fmt(r.amount)+' 元</b></div>'+
+          (r.qty>0?'<div class="kv"><span class="mu">折算每条</span><span>'+fmt(r.amount/r.qty)+' 元/条</span></div>':'')+
+          '<div class="kv"><span class="mu">账面红旗价（总额）</span><span>'+fmt(book)+' 元</span></div>'+
+          '<div class="kv"><span class="mu">对估算利润</span><span>'+adjDeltaHTML(d)+'</span></div>'+
+          '<div class="kv"><span class="mu">日期</span><span>'+esc(r.date||'—')+'</span></div>'+
+          '<div class="kv"><span class="mu">备注</span><span>'+(r.note?esc(r.note):'—')+'</span></div>'+
+          (aDel===r.id?'<div class="err" style="font-size:11px">⚠️ 再点一次「删除」将永久移除这笔，无法撤销。</div>':'')+
+          '<div class="row" style="margin-top:6px">'+
+            '<button data-act="adjEdit" data-v="'+r.id+'"'+(editing?' class="on"':'')+'>'+(editing?'正在修改…':'修改')+'</button>'+
+            '<button data-act="adjDel" data-v="'+r.id+'">'+(aDel===r.id?'再点确认删除':'删除')+'</button>'+
+            '<button data-act="adjToggle" data-v="'+r.id+'">收起</button>'+
+          '</div>'+
+          (editing?adjForm(r):'')+
+        '</div>';
+      }
+      return x+'</div>';
     }).join('')+'</div>';
   }
-  if(aEdit){
-    h+='<div class="bform">'+
-      '<div class="mu" style="font-size:12px;line-height:1.5">👇 下面「实际抵 / 换到」填<b>这笔一共抵了多少钱</b>（条数 × 每条抵的钱），<b>不是单条价</b>。留空则按烟草价自动算。</div>'+
-      '<div><span class="mu">日期（选填）</span><input id="a_date" type="date" value="'+esc(defaultBatchDate())+'"></div>'+
-      '<div><span class="mu">哪款烟</span><select id="a_pid">'+S.products.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></div>'+
-      '<div class="grid">'+
-        '<div><span class="mu">条数</span><input id="a_qty" type="number" min="0" step="1" placeholder="如 2"></div>'+
-        '<div><span class="mu">实际抵 / 换到（元，填总额）</span><input id="a_amt" type="number" step="0.1" placeholder="如 2 条共 476"></div>'+
-      '</div>'+
-      '<div id="a_ref" class="mu"></div>'+
-      '<div><input id="a_note" placeholder="备注，如 还款 / 换现金 / 换烟倒挂 10 元"></div>'+
-      '<div class="row"><button data-act="adjCancel">取消</button><button class="on" data-act="adjSave">确定</button></div>'+
-      '</div>';
-  }
+  if(aEdit===true)h+=adjForm(null);
   return h+'</div>';
 }
 
@@ -577,6 +631,8 @@ function viewLog(){
     return a;
   },{n:0,c:0,r:0,f:0});
   const dp=dProfit(month),est=tot.f-tot.c,adj=adjImpact(month),real=est-adj;
+  const adjTxt=Math.abs(adj)<0.005?'特殊处置无影响'
+    :(adj>0?'已扣特殊处置 '+fmt(adj)+' 元':'特殊处置反加 '+fmt(-adj)+' 元');
   const mx=Math.max(1,...rows.map(p=>qty(month,p.id)));
   const B=bts(month),cur=bt(month,bSel);
   const SB=sortedBatches(month);
@@ -621,9 +677,9 @@ function viewLog(){
     '<div><span class="mu">烟贩价利润</span><b class="'+(dp>=0?'ok':'err')+'">'+fmt(dp)+'</b>'+
       '<span class="mu" style="display:block;font-size:11px">仅烟贩渠道进的烟</span></div>'+
     '<div><span class="mu">估算利润</span><b class="'+(est>=0?'ok':'err')+'">'+fmt(est)+'</b>'+
-      '<span class="mu" style="display:block;font-size:11px">未扣还款 / 换烟</span></div>'+
+      '<span class="mu" style="display:block;font-size:11px">未计还款 / 换烟</span></div>'+
     '<div><span class="mu">接近真实利润</span><b class="'+(real>=0?'ok':'err')+'">'+fmt(real)+'</b>'+
-      '<span class="mu" style="display:block;font-size:11px">已扣特殊处置 '+fmt(adj)+' 元</span></div>'+
+      '<span class="mu" style="display:block;font-size:11px">'+adjTxt+'</span></div>'+
     '</div>';
 
   h+=viewAdj();
@@ -764,6 +820,10 @@ function render(){
   if(pick.pid&&!P(pick.pid))pick={open:false,q:'',pid:null,newProd:false,newName:''};
   if(edit&&edit!=='new'&&!P(edit)){edit=null;delId=null}
   if(bSel!=='all'&&!bt(month,bSel))bSel='all';
+  const adjIds=adjs(month).map(r=>r.id);
+  if(aOpen&&adjIds.indexOf(aOpen)<0)aOpen=null;
+  if(aEdit&&aEdit!==true&&adjIds.indexOf(aEdit)<0)aEdit=null;
+  if(aDel&&adjIds.indexOf(aDel)<0)aDel=null;
   $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
   if(pick.open&&!pick.pid&&!pick.newProd){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
   if(aEdit)refreshAdjRef();
@@ -793,7 +853,8 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='mo'&&t.value){
     month=t.value;ss('month',month);bSel=ss('bsel_'+month)||'all';
-    bEdit=null;bDel=null;edit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};
+    bEdit=null;bDel=null;edit=null;aEdit=null;aDel=null;aOpen=null;
+    pick={open:false,q:'',pid:null,newProd:false,newName:''};
     render();return;
   }
   if(t.dataset&&t.dataset.act==='price'){
@@ -908,7 +969,11 @@ document.addEventListener('click',e=>{
     bDel=null;touch();render();
   }else if(a==='adjNew'){
     if(!S.products.length){alert('先到「烟品目录」添加烟品，才能记特殊处置。');return}
-    aEdit=true;aDel=null;render();return
+    aEdit=true;aOpen=null;aDel=null;render();return
+  }else if(a==='adjToggle'){
+    aOpen=(aOpen===v?null:v);aEdit=null;aDel=null;render();return
+  }else if(a==='adjEdit'){
+    aOpen=v;aEdit=v;aDel=null;render();return
   }else if(a==='adjCancel'){aEdit=null;render();return}
   else if(a==='adjSave'){
     const pid=$('#a_pid').value;
@@ -920,15 +985,28 @@ document.addEventListener('click',e=>{
     const ac=chkMoney($('#a_amt').value,'实际抵 / 换到的金额',true);
     if(!ac.ok){alert(ac.msg);return}
     const amt=ac.empty?q*p0.cost:ac.val;
+    const d={date:$('#a_date').value||defaultBatchDate(),pid,qty:q,amount:amt,note:$('#a_note').value.trim()};
     S.adjust=S.adjust||{};
     const arr=S.adjust[month]=S.adjust[month]||[];
-    const id=arr.reduce((x,r)=>Math.max(x,r.id),0)+1;
-    arr.push({id,date:$('#a_date').value||defaultBatchDate(),pid,qty:q,amount:amt,note:$('#a_note').value.trim()});
-    aEdit=null;aDel=null;touch();render();return
+    const editingId=(aEdit!==true&&aEdit!=null)?aEdit:null;
+    let keepOpen=aOpen;
+    if(editingId){
+      const r=arr.find(x=>x.id===editingId);
+      if(!r){alert('这笔记录已不存在，请重新点开条目。');aEdit=null;render();return}
+      Object.assign(r,d);
+      keepOpen=editingId;
+    }else{
+      const id=arr.reduce((x,r)=>Math.max(x,r.id),0)+1;
+      arr.push(Object.assign({id},d));
+      keepOpen=id;
+    }
+    aEdit=null;aOpen=keepOpen;aDel=null;touch();render();return
   }else if(a==='adjDel'){
     if(aDel!==v){aDel=v;render();return}
     S.adjust[month]=(S.adjust[month]||[]).filter(r=>r.id!==v);
     if(!S.adjust[month].length)delete S.adjust[month];
+    if(aOpen===v)aOpen=null;
+    if(aEdit===v)aEdit=null;
     aDel=null;touch();render();return
   }else if(a==='new'){edit='new';render()}
   else if(a==='edit'){edit=v;render()}
