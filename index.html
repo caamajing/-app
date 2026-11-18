@@ -477,14 +477,8 @@ function scrollChipIntoView(){
   const chip=document.querySelector('#app .chips .chip.on');
   if(chip && chip.parentElement){
     const parent=chip.parentElement;
-    const chipLeft=chip.offsetLeft, chipRight=chip.offsetLeft+chip.offsetWidth;
-    const viewLeft=parent.scrollLeft, viewRight=viewLeft+parent.clientWidth;
-    if(chipLeft<viewLeft || chipRight>viewRight){
-      parent.scrollTo({
-        left:Math.max(0, chipLeft - (parent.clientWidth - chip.offsetWidth)/2),
-        behavior:'smooth'
-      });
-    }
+    const target=chip.offsetLeft - (parent.clientWidth - chip.offsetWidth)/2;
+    parent.scrollLeft=Math.max(0, target);   // 直接瞬间定位，不做动画
   }
 }
 
@@ -492,7 +486,7 @@ function render(){
   meta();
   $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
   if(pick.open&&!pick.pid){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
-  scrollChipIntoView();
+  requestAnimationFrame(()=>{requestAnimationFrame(scrollChipIntoView)});
 }
 
 let composing=false;
