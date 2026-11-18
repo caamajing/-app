@@ -466,10 +466,26 @@ function viewProd(){
   return h+'<div class="mu">删除会同时清除该烟的历史流水，一般建议改为「停供」。</div>';
 }
 
+function scrollChipIntoView(){
+  const chip=document.querySelector('#app .chips .chip.on');
+  if(chip && chip.parentElement){
+    const parent=chip.parentElement;
+    const chipLeft=chip.offsetLeft, chipRight=chip.offsetLeft+chip.offsetWidth;
+    const viewLeft=parent.scrollLeft, viewRight=viewLeft+parent.clientWidth;
+    if(chipLeft<viewLeft || chipRight>viewRight){
+      parent.scrollTo({
+        left:Math.max(0, chipLeft - (parent.clientWidth - chip.offsetWidth)/2),
+        behavior:'smooth'
+      });
+    }
+  }
+}
+
 function render(){
   meta();
   $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
   if(pick.open&&!pick.pid){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+  scrollChipIntoView();
 }
 
 let composing=false;
@@ -618,10 +634,7 @@ document.addEventListener('click',e=>{
 
 migrate();
 render();
-  setTimeout(()=>{
-  const chip=$('#app .chip.on');
-  if(chip)chip.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
-},50);
+  
 </script>
 </body></html>
 
