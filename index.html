@@ -406,14 +406,15 @@ function viewLog(){
 
   if(!rows.length)h+='<div class="card mu">本月还没有开烟记录。点上方「＋ 新增开烟」建批次，再用「＋ 录入本次开烟」添加。</div>';
   const sb=bSel;
-  // 选中具体批次时：本批开过的烟排最前面，其余保持原来的先后顺序
-  if(sb!=='all'){
-    rows.sort((p1,p2)=>(bqty(month,p1.id,sb)>0?0:1)-(bqty(month,p2.id,sb)>0?0:1));
-  }
+  // 无论「全部」还是「第 N 次」，都按当前视图下的条数从多到少排
+  const viewQty=p=>sb==='all'?qty(month,p.id):bqty(month,p.id,sb);
+  const origOrder=new Map(rows.map((p,i)=>[p.id,i]));
+  rows.sort((a,b)=>viewQty(b)-viewQty(a)||origOrder.get(a.id)-origOrder.get(b.id));
+  const viewMx=Math.max(1,...rows.map(p=>viewQty(p)));
   rows.forEach((p,i)=>{
     const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
-    if(showing&&!bn&&(i===0||bqty(month,rows[i-1].id,sb)>0)){
-      h+='<div class="mu" style="margin:10px 2px 2px;border-top:1px dashed var(--ln);padding-top:8px">↓ 以下为本月其他批次开过的烟，本批未开</div>';
+    if(showing&&!bn&&(i===0||viewQty(rows[i-1])>0)){
+      h+='<div class="mu" style="margin:10px 2px 2px;border-top:1px dashed var(--ln);padding-top:8px">↓ 以下烟品本批未开（仅显示月累计）</div>';
     }
     let body='';
     body='<div class="srcs">'+
@@ -428,7 +429,7 @@ function viewLog(){
 '<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
 '<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b></div>'+
 '<div class="mu" style="margin-top:4px"><span style="color:var(--ac);font-weight:600">烟草 '+bqtyOf(month,p.id,sb,'t')+'</span> 条 · <span style="color:var(--ac);font-weight:600">烟贩 '+bqtyOf(month,p.id,sb,'d')+'</span> 条</div>'+
-body+(disp?'<div class="bar" style="width:'+(disp/mx*100)+'%"></div>':'')+
+body+(disp?'<div class="bar" style="width:'+(disp/viewMx*100)+'%"></div>':'')+
 '<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 8px;font-size:12px">'+(editor?'完成':'修改')+'</button></div>'+
 '</div>';
   });
