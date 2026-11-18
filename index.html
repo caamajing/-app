@@ -346,17 +346,17 @@ function viewLog(){
   },{n:0,c:0,r:0,f:0});
   const mx=Math.max(1,...rows.map(p=>qty(month,p.id)));
   const B=bts(month),cur=bt(month,bSel);
+  const SB=sortedBatches(month);
   if(bSel!=='all'&&!cur)bSel='all';
   let h='<input type="month" id="mo" value="'+month+'">';
 
   h+='<div class="bh"><div class="row"><b>本月开烟批次</b>'+
     '<button data-act="newB" style="padding:4px 10px;font-size:12px">＋ 新增开烟</button></div>';
   if(B.length){
-    const SB = sortedBatches(month);
-h+='<div class="btot">'+SB.map((b,idx)=>'第'+(idx+1)+'次 <i>'+(b.date?b.date.slice(5).replace('-','/'):'—')+'</i> '+btQty(month,b.id)+' 条').join('<i>|</i>')+'</div>';
-   h+='<div class="blist">'+SB.map((b,idx)=>{
-  const q=btQty(month,b.id);
-  return '<div class="bitem"><span class="no">'+(idx+1)+'</span>'+
+    h+='<div class="btot">'+SB.map((b,idx)=>'第'+(idx+1)+'次 <i>'+(b.date?b.date.slice(5).replace('-','/'):'—')+'</i> '+btQty(month,b.id)+' 条').join('<i>|</i>')+'</div>';
+    h+='<div class="blist">'+SB.map((b,idx)=>{
+      const q=btQty(month,b.id);
+      return '<div class="bitem"><span class="no">'+(idx+1)+'</span>'+
         '<span class="dt">'+(b.date?b.date.slice(5).replace('-','/')+' 日':'未填日期')+'</span>'+
         '<span class="nt">'+(b.note?esc(b.note):'<span class="mu">无备注</span>')+'</span>'+
         '<span class="q">'+q+' 条</span>'+
@@ -388,13 +388,13 @@ h+='<div class="btot">'+SB.map((b,idx)=>'第'+(idx+1)+'次 <i>'+(b.date?b.date.s
 
   if(B.length){
     h+='<div class="chips">'+
-  '<button class="chip'+(bSel==='all'?' on':'')+'" data-act="selB" data-v="all">全部（'+btQty(month,'all')+' 条）</button>'+
-  SB.map((b,idx)=>'<button class="chip'+(bSel===b.id?' on':'')+'" data-act="selB" data-v="'+b.id+'">第'+(idx+1)+'次 · '+(b.date?b.date.slice(5).replace('-','/'):'—')+' · <b>'+btQty(month,b.id)+'</b> 条</button>').join('')+
-  '</div>';
+      '<button class="chip'+(bSel==='all'?' on':'')+'" data-act="selB" data-v="all">全部（'+btQty(month,'all')+' 条）</button>'+
+      SB.map((b,idx)=>'<button class="chip'+(bSel===b.id?' on':'')+'" data-act="selB" data-v="'+b.id+'">第'+(idx+1)+'次 · '+(b.date?b.date.slice(5).replace('-','/'):'—')+' · <b>'+btQty(month,b.id)+'</b> 条</button>').join('')+
+      '</div>';
     if(bSel!=='all'&&cur){
       const c=btCost(month,bSel),f=btFlag(month,bSel);
       const curIdx = SB.findIndex(b=>b.id===bSel);
-h+='<div class="card" style="padding:8px 10px"><div class="mu">第'+(curIdx+1)+'次开烟 · '+(cur.date||'未填日期')+(cur.note?' · '+esc(cur.note):'')+'</div>'+
+      h+='<div class="card" style="padding:8px 10px"><div class="mu">第'+(curIdx+1)+'次开烟 · '+(cur.date||'未填日期')+(cur.note?' · '+esc(cur.note):'')+'</div>'+
         '<div class="mu">成本 <b>'+fmt(c)+'</b> 元 · 红旗销售额 <b>'+fmt(f)+'</b> 元 · 利润 <b class="'+(f-c>=0?'ok':'err')+'">'+fmt(f-c)+'</b> 元</div></div>';
     }
   }
@@ -438,7 +438,6 @@ function srcRow(src,label,m,p,b,q){
     (q?'<span class="pr"><span>@</span><input type="number" step="0.1" min="0" placeholder="'+fmt(ph)+'" value="'+pr+'" data-act="price" data-src="'+src+'" data-v="'+p.id+'"'+(locked?' disabled':'')+'></span>':'<span class="pr mu">点 + 添加</span>')+
     '</div>';
 }
-
 
 function viewSum(){
   const ms=months().filter(m=>Object.keys(S.log[m]).length).sort().reverse().slice(0,12);
