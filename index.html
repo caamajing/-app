@@ -490,11 +490,20 @@ function pickListHTML(){
 }
 function refreshAdjRef(){
   const el=$('#a_ref');if(!el)return;
-  const sel=$('#a_pid'),qel=$('#a_qty');
-  const p=sel?P(sel.value):null,q=qel?num(qel.value):0;
-  if(!p){el.innerHTML='选好烟品后，这里会显示参考金额';return}
-  el.innerHTML='参考：烟草价 <b>'+fmt(q*p.cost)+'</b> 元 · 账面红旗价 <b>'+fmt(q*flagOf(p))+'</b> 元'+
-    '　｜　金额留空 = 按烟草价 '+fmt(q*p.cost)+' 元自动算（还款场景）';
+  const sel=$('#a_pid'),qel=$('#a_qty'),ael=$('#a_amt');
+  const p=sel?P(sel.value):null,q=qel?Math.max(0,num(qel.value)):0;
+  if(!p){el.innerHTML='选好烟品、填好条数后，这里会帮你核对金额';return}
+  const raw=ael?String(ael.value==null?'':ael.value).trim():'';
+  let detail;
+  if(raw===''){
+    detail='金额留空 = 自动按烟草价算 <b>'+fmt(q*p.cost)+'</b> 元（'+q+' 条 × '+fmt(p.cost)+'/条），适合还款';
+  }else{
+    const amt=num(raw),per=q>0?amt/q:0;
+    detail='你填的 <b>'+fmt(amt)+'</b> 元 = 这 '+q+' 条<b>一共</b>抵 / 换到的钱，折算每条 <b>'+fmt(per)+'</b> 元'+
+      '<div class="mu" style="margin-top:2px">核对一下：这里要填总额，不是单条价</div>';
+  }
+  el.innerHTML='参考：烟草价总额 <b>'+fmt(q*p.cost)+'</b> 元 · 账面红旗价总额 <b>'+fmt(q*flagOf(p))+'</b> 元'+
+    '<div style="margin-top:4px">'+detail+'</div>';
 }
 function refreshPickList(){
   const box=$('#pk_list');if(!box)return;
@@ -539,17 +548,18 @@ function viewAdj(){
       const p=P(r.pid),book=p?r.qty*flagOf(p):r.amount;
       return '<div class="bitem"><span class="dt">'+(r.date?r.date.slice(5).replace('-','/'):'—')+'</span>'+
         '<span class="nt">'+esc(p?p.name:'（烟品已删除）')+' · '+r.qty+' 条'+(r.note?' · '+esc(r.note):'')+'</span>'+
-        '<span class="q">实际 '+fmt(r.amount)+' 元 · 扣 '+fmt(book-r.amount)+' 元</span>'+
+        '<span class="q">实际 '+fmt(r.amount)+' 元'+(r.qty>0?'（每条 '+fmt(r.amount/r.qty)+'）':'')+' · 扣 '+fmt(book-r.amount)+' 元</span>'+
         '<button data-act="adjDel" data-v="'+r.id+'">'+(aDel===r.id?'再点确认':'删除')+'</button></div>';
     }).join('')+'</div>';
   }
   if(aEdit){
     h+='<div class="bform">'+
+      '<div class="mu" style="font-size:12px;line-height:1.5">👇 下面「实际抵 / 换到」填<b>这笔一共抵了多少钱</b>（条数 × 每条抵的钱），<b>不是单条价</b>。留空则按烟草价自动算。</div>'+
       '<div><span class="mu">日期（选填）</span><input id="a_date" type="date" value="'+esc(defaultBatchDate())+'"></div>'+
       '<div><span class="mu">哪款烟</span><select id="a_pid">'+S.products.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></div>'+
       '<div class="grid">'+
         '<div><span class="mu">条数</span><input id="a_qty" type="number" min="0" step="1" placeholder="如 2"></div>'+
-        '<div><span class="mu">实际抵 / 换到（元）</span><input id="a_amt" type="number" step="0.1" placeholder="留空=按烟草价"></div>'+
+        '<div><span class="mu">实际抵 / 换到（元，填总额）</span><input id="a_amt" type="number" step="0.1" placeholder="如 2 条共 476"></div>'+
       '</div>'+
       '<div id="a_ref" class="mu"></div>'+
       '<div><input id="a_note" placeholder="备注，如 还款 / 换现金 / 换烟倒挂 10 元"></div>'+
@@ -777,7 +787,7 @@ document.addEventListener('input',e=>{
     if(!composing)refreshPickList();
   }
   if((id==='f_name'||id==='qp_name')&&!composing)refreshNameHint();
-  if(id==='a_qty'||id==='a_pid')refreshAdjRef();
+  if(id==='a_qty'||id==='a_pid'||id==='a_amt')refreshAdjRef();
 });
 document.addEventListener('change',e=>{
   const t=e.target;
@@ -798,7 +808,7 @@ document.addEventListener('change',e=>{
     }
     touch();
   }
-  if(t.id==='a_pid'||t.id==='a_qty')refreshAdjRef();
+  if(t.id==='a_pid'||t.id==='a_qty'||t.id==='a_amt')refreshAdjRef();
   if(t.id==='impFile'&&t.files&&t.files[0])importData(t.files[0]);
 });
 document.addEventListener('focusout',e=>{
