@@ -508,7 +508,7 @@ function scrollChipIntoView(){
   const chip=document.querySelector('#app .chips .chip.on');
   if(chip && chip.parentElement){
     const parent=chip.parentElement;
-    const target=chip.offsetLeft - (parent.clientWidth - chip.offsetWidth)/2；
+    const target=chip.offsetLeft - (parent.clientWidth - chip.offsetWidth)/2;
     parent.scrollLeft=Math.max(0, target);   // 直接瞬间定位，不做动画
   }
 }
