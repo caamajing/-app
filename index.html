@@ -403,7 +403,7 @@ function viewLog(){
     h+='<div class="card"><div class="row"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+
 '<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
 '<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b></div>'+
-'<div class="mu" style="margin-top:4px">烟草 '+bqtyOf(month,p.id,sb,'t')+' 条 · 烟贩 '+bqtyOf(month,p.id,sb,'d')+' 条</div>'+
+'<div class="mu" style="margin-top:4px"><span style="color:var(--ac);font-weight:600">烟草 '+bqtyOf(month,p.id,sb,'t')+'</span> 条 · <span style="color:var(--ac);font-weight:600">烟贩 '+bqtyOf(month,p.id,sb,'d')+'</span> 条</div>'+
 body+(disp?'<div class="bar" style="width:'+(disp/mx*100)+'%"></div>':'')+
 '<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 8px;font-size:12px">'+(editor?'完成':'修改')+'</button></div>'+
 '</div>';
