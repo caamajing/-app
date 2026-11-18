@@ -320,7 +320,7 @@ function refreshPickList(){
 function pickPanel(){
   if(!pick.open)return '';
   const curBid=(bSel!=='all'&&bt(month,bSel))?bSel:(bts(month)[0]||{}).id;
-  const bno=curBid?'第'+curBid+'次':'未选批次';
+  const bno=curBid?'第'+(sortedBatches(month).findIndex(x=>x.id===curBid)+1)+'次':'未选批次';
   let h='<div class="card"><div class="row"><b>录入本次开烟 · '+bno+'</b><button data-act="closePick" style="padding:3px 8px;font-size:12px">关闭</button></div>';
   if(pick.pid){
     const p=P(pick.pid);
@@ -401,8 +401,15 @@ function viewLog(){
 
   if(!rows.length)h+='<div class="card mu">本月还没有开烟记录。点上方「＋ 新增开烟」建批次，再用「＋ 录入本次开烟」添加。</div>';
   const sb=bSel;
-  rows.forEach(p=>{
+  // 选中具体批次时：本批开过的烟排最前面，其余保持原来的先后顺序
+  if(sb!=='all'){
+    rows.sort((p1,p2)=>(bqty(month,p1.id,sb)>0?0:1)-(bqty(month,p2.id,sb)>0?0:1));
+  }
+  rows.forEach((p,i)=>{
     const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
+    if(showing&&!bn&&(i===0||bqty(month,rows[i-1].id,sb)>0)){
+      h+='<div class="mu" style="margin:10px 2px 2px;border-top:1px dashed var(--ln);padding-top:8px">↓ 以下为本月其他批次开过的烟，本批未开</div>';
+    }
     let body='';
     body='<div class="srcs">'+
       (editor?srcRow('t','烟草',month,p,sb,bqtyOf(month,p.id,sb,'t'))+
@@ -551,7 +558,7 @@ document.addEventListener('change',e=>{
     }
     setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value);
     touch();
-}
+  }
   if(t.id==='impFile'&&t.files&&t.files[0])importData(t.files[0]);
 });
 document.addEventListener('focusout',e=>{
