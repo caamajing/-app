@@ -209,6 +209,11 @@ const qty=(m,id)=>bqty(m,id,'all');
 const costOf=(m,id)=>bcost(m,id,'all');
 const flagOf=p=>p.actual||(p.retail*10);
 
+function defaultBatchDate(){
+  const d=new Date();
+  const today=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return today.slice(0,7)===month ? today : month+'-01';
+}
 function addBatch(m,date,note){
   S.log.batches=S.log.batches||{};
   const arr=S.log.batches[m]=S.log.batches[m]||[];
@@ -367,7 +372,7 @@ function viewLog(){
     h+='<div class="mu">还没有批次，点右上「＋ 新增开烟」建第 1 次。</div>';
   }
   if(bEdit){
-    const nb=bEdit==='new'?{date:new Date().toISOString().slice(0,10),note:''}:bt(month,bEdit);
+    const nb=bEdit==='new'?{date:defaultBatchDate(),note:''}:bt(month,bEdit);
     h+='<div class="bform">'+
       '<div><span class="mu">开烟日期</span><input id="b_date" type="date" value="'+esc(nb.date)+'"></div>'+
       '<div><span class="mu">备注（如 常规投放 / 补货 / 节前投放）</span><input id="b_note" placeholder="选填" value="'+esc(nb.note)+'"></div>'+
@@ -582,7 +587,7 @@ function curB(){
 }
 function ensureB(){
   if(bts(month).length)return curB();
-  return addBatch(month,new Date().toISOString().slice(0,10),'');
+  return addBatch(month,defaultBatchDate(),'');
 }
 
 document.addEventListener('click',e=>{
