@@ -145,7 +145,7 @@ const KEY='ciglog_data_v2';
 const ss=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){}};
 const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=false,edit=null,delId=null,status='',tm;
-let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null;
+let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null,aEdit=null,aDel=null;
 let pick={open:false,q:'',pid:null};
 
 function loadData(){
@@ -209,6 +209,17 @@ const qty=(m,id)=>bqty(m,id,'all');
 const costOf=(m,id)=>bcost(m,id,'all');
 const flagOf=p=>p.actual||(p.retail*10);
 
+// ===== 特殊处置（还款 / 换烟贩）与烟贩价利润 =====
+const adjs=m=>(S.adjust&&S.adjust[m])||[];
+// 账面按红旗价卖了，实际只抵/换了 amount 元：差额就是要从估算利润里扣掉的
+const adjImpact=m=>adjs(m).reduce((a,r)=>{
+  const p=P(r.pid);
+  const book=p?r.qty*flagOf(p):r.amount;
+  return a+(book-r.amount);
+},0);
+// 只算从烟贩渠道（d）进的烟：红旗售价 - 当时实际进价
+const dProfit=m=>S.products.reduce((a,p)=>
+  a+flow(m,p.id).filter(f=>f.src==='d').reduce((s,f)=>s+f.qty*(flagOf(p)-f.price),0),0);
 function defaultBatchDate(){
   const d=new Date();
   const today=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -279,7 +290,7 @@ function importData(file){
       const d=JSON.parse(r.result);
       if(!d||!Array.isArray(d.products)||typeof d.log!=='object')throw new Error('格式不对');
       if(!confirm('导入将覆盖当前全部数据，确定继续？'))return;
-      S=d;
+      S=d;S.adjust=S.adjust||{};
       if(S._batches){S.log.batches=S._batches;delete S._batches}
       migrate();save();render();alert('导入成功');
     }catch(e){alert('导入失败：'+e.message)}
@@ -317,6 +328,14 @@ function pickListHTML(){
   if(list.length>8)h+='<div class="mu" style="margin-top:6px">还有 '+(list.length-8)+' 条，继续输入关键词缩小范围。</div>';
   return h;
 }
+function refreshAdjRef(){
+  const el=$('#a_ref');if(!el)return;
+  const sel=$('#a_pid'),qel=$('#a_qty');
+  const p=sel?P(sel.value):null,q=qel?num(qel.value):0;
+  if(!p){el.innerHTML='选好烟品后，这里会显示参考金额';return}
+  el.innerHTML='参考：烟草价 <b>'+fmt(q*p.cost)+'</b> 元 · 账面红旗价 <b>'+fmt(q*flagOf(p))+'</b> 元'+
+    '　｜　金额留空 = 按烟草价 '+fmt(q*p.cost)+' 元自动算（还款场景）';
+}
 function refreshPickList(){
   const box=$('#pk_list');if(!box)return;
   box.innerHTML=pickListHTML();
@@ -342,6 +361,37 @@ function pickPanel(){
   return h+'</div>';
 }
 
+function viewAdj(){
+  const list=adjs(month),imp=adjImpact(month);
+  let h='<div class="card"><div class="row"><b>特殊处置 · 还款 / 换烟贩</b>'+
+    '<button data-act="adjNew" style="padding:4px 10px;font-size:12px">＋ 记一笔</button></div>';
+  h+='<div class="mu" style="margin-top:4px">这些烟没按红旗价卖出去，而是抵了债或换给烟贩。本月 <b>'+list.length+'</b> 笔 · 共从估算利润扣 <b>'+fmt(imp)+'</b> 元</div>';
+  if(!S.products.length)h+='<div class="mu" style="margin-top:6px">还没有烟品，先到「烟品目录」添加后才能记账。</div>';
+  if(list.length){
+    h+='<div class="blist" style="margin-top:8px">'+list.map(r=>{
+      const p=P(r.pid),book=p?r.qty*flagOf(p):r.amount;
+      return '<div class="bitem"><span class="dt">'+(r.date?r.date.slice(5).replace('-','/'):'—')+'</span>'+
+        '<span class="nt">'+esc(p?p.name:'（烟品已删除）')+' · '+r.qty+' 条'+(r.note?' · '+esc(r.note):'')+'</span>'+
+        '<span class="q">实际 '+fmt(r.amount)+' 元 · 扣 '+fmt(book-r.amount)+' 元</span>'+
+        '<button data-act="adjDel" data-v="'+r.id+'">'+(aDel===r.id?'再点确认':'删除')+'</button></div>';
+    }).join('')+'</div>';
+  }
+  if(aEdit){
+    h+='<div class="bform">'+
+      '<div><span class="mu">日期（选填）</span><input id="a_date" type="date" value="'+esc(defaultBatchDate())+'"></div>'+
+      '<div><span class="mu">哪款烟</span><select id="a_pid">'+S.products.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('')+'</select></div>'+
+      '<div class="grid">'+
+        '<div><span class="mu">条数</span><input id="a_qty" type="number" min="0" step="1" placeholder="如 2"></div>'+
+        '<div><span class="mu">实际抵 / 换到（元）</span><input id="a_amt" type="number" step="0.1" placeholder="留空=按烟草价"></div>'+
+      '</div>'+
+      '<div id="a_ref" class="mu"></div>'+
+      '<div><input id="a_note" placeholder="备注，如 还款 / 换现金 / 换烟倒挂 10 元"></div>'+
+      '<div class="row"><button data-act="adjCancel">取消</button><button class="on" data-act="adjSave">确定</button></div>'+
+      '</div>';
+  }
+  return h+'</div>';
+}
+
 function viewLog(){
   const rows=S.products.filter(p=>qty(month,p.id)>0);
   const tot=rows.reduce((a,p)=>{
@@ -349,6 +399,7 @@ function viewLog(){
     a.n+=n;a.c+=costOf(month,p.id);a.r+=n*p.retail*10;a.f+=n*flagOf(p);
     return a;
   },{n:0,c:0,r:0,f:0});
+  const dp=dProfit(month),est=tot.f-tot.c,adj=adjImpact(month),real=est-adj;
   const mx=Math.max(1,...rows.map(p=>qty(month,p.id)));
   const B=bts(month),cur=bt(month,bSel);
   const SB=sortedBatches(month);
@@ -388,8 +439,15 @@ function viewLog(){
     '<div><span class="mu">按建议价销售额</span><b>'+fmt(tot.r)+'</b></div>'+
     '<div><span class="mu">理论毛利</span><b class="'+(tot.r-tot.c>=0?'ok':'err')+'">'+fmt(tot.r-tot.c)+'</b></div>'+
     '<div><span class="mu">红旗售价销售额</span><b>'+fmt(tot.f)+'</b></div>'+
-    '<div><span class="mu">实际利润</span><b class="'+(tot.f-tot.c>=0?'ok':'err')+'">'+fmt(tot.f-tot.c)+'</b></div>'+
+    '<div><span class="mu">烟贩价利润</span><b class="'+(dp>=0?'ok':'err')+'">'+fmt(dp)+'</b>'+
+      '<span class="mu" style="display:block;font-size:11px">仅烟贩渠道进的烟</span></div>'+
+    '<div><span class="mu">估算利润</span><b class="'+(est>=0?'ok':'err')+'">'+fmt(est)+'</b>'+
+      '<span class="mu" style="display:block;font-size:11px">未扣还款 / 换烟</span></div>'+
+    '<div><span class="mu">接近真实利润</span><b class="'+(real>=0?'ok':'err')+'">'+fmt(real)+'</b>'+
+      '<span class="mu" style="display:block;font-size:11px">已扣特殊处置 '+fmt(adj)+' 元</span></div>'+
     '</div>';
+
+  h+=viewAdj();
 
   if(B.length){
     h+='<div class="chips">'+
@@ -529,6 +587,7 @@ function render(){
   meta();
   $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
   if(pick.open&&!pick.pid){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+  if(aEdit)refreshAdjRef();
   requestAnimationFrame(()=>{requestAnimationFrame(scrollChipIntoView)});
 }
 
@@ -548,6 +607,7 @@ document.addEventListener('input',e=>{
     pick.q=e.target.value;
     if(!composing)refreshPickList();
   }
+  if(e.target.id==='a_qty'||e.target.id==='a_pid')refreshAdjRef();
 });
 document.addEventListener('change',e=>{
   const t=e.target;
@@ -565,6 +625,7 @@ document.addEventListener('change',e=>{
     setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value);
     touch();
   }
+  if(t.id==='a_pid'||t.id==='a_qty')refreshAdjRef();
   if(t.id==='impFile'&&t.files&&t.files[0])importData(t.files[0]);
 });
 document.addEventListener('focusout',e=>{
@@ -648,6 +709,25 @@ document.addEventListener('click',e=>{
     if(bSel===v||bSel===String(v))bSel='all';
     ss('bsel_'+month,bSel);
     bDel=null;touch();render();
+  }else if(a==='adjNew'){
+    if(!S.products.length){alert('先到「烟品目录」添加烟品，才能记特殊处置。');return}
+    aEdit=true;aDel=null;render();return
+  }else if(a==='adjCancel'){aEdit=null;render();return}
+  else if(a==='adjSave'){
+    const pid=$('#a_pid').value,q=Math.max(0,num($('#a_qty').value)|0);
+    if(!pid||!q){alert('请选择烟品，并填写条数。');return}
+    const raw=$('#a_amt').value.trim(),p0=P(pid);
+    const amt=raw===''?q*(p0?p0.cost:0):num(raw);
+    S.adjust=S.adjust||{};
+    const arr=S.adjust[month]=S.adjust[month]||[];
+    const id=arr.reduce((x,r)=>Math.max(x,r.id),0)+1;
+    arr.push({id,date:$('#a_date').value||defaultBatchDate(),pid,qty:q,amount:amt,note:$('#a_note').value.trim()});
+    aEdit=null;aDel=null;touch();render();return
+  }else if(a==='adjDel'){
+    if(aDel!==v){aDel=v;render();return}
+    S.adjust[month]=(S.adjust[month]||[]).filter(r=>r.id!==v);
+    if(!S.adjust[month].length)delete S.adjust[month];
+    aDel=null;touch();render();return
   }else if(a==='new'){edit='new';render()}
   else if(a==='edit'){edit=v;render()}
   else if(a==='cancel'){edit=null;render()}
@@ -669,6 +749,10 @@ document.addEventListener('click',e=>{
     if(delId!==v){delId=v;render();return}
     S.products=S.products.filter(p=>p.id!==v);
     months().forEach(m=>{delete S.log[m][v]});
+    if(S.adjust)Object.keys(S.adjust).forEach(m=>{
+      S.adjust[m]=S.adjust[m].filter(r=>r.pid!==v);
+      if(!S.adjust[m].length)delete S.adjust[m];
+    });
     delId=null;touch();render();
  }else if(a==='editCard'){
     editor=!editor;
