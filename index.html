@@ -142,11 +142,13 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 <script>
 const $=s=>document.querySelector(s);
 const KEY='ciglog_data_v2';
+const SCHEMA=2;                       // 备份 / 本地数据格式版本
+const MAX_QTY=99999,MAX_MONEY=99999999;
 const ss=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){}};
 const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=false,edit=null,delId=null,status='',tm;
 let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null,aEdit=null,aDel=null;
-let pick={open:false,q:'',pid:null};
+let pick={open:false,q:'',pid:null,newProd:false,newName:''};
 
 function loadData(){
   try{const raw=localStorage.getItem(KEY);if(raw)return JSON.parse(raw)}catch(e){}
@@ -173,6 +175,7 @@ function migrate(){
   S.log=rest;
   S.log.batches=B;
   months().forEach(m=>{
+    if(!S.log[m]||typeof S.log[m]!=='object'){S.log[m]={};return}
     Object.keys(S.log[m]).forEach(id=>{
       const v=S.log[m][id],p=P(id);
       if(Array.isArray(v)){S.log[m][id]=v.map(f=>({b:f.b||0,src:f.src,qty:f.qty,price:f.price}));return}
@@ -191,7 +194,94 @@ const fmt=n=>(Math.round(n*100)/100).toLocaleString('zh-CN');
 const fmt0=n=>Math.round(n).toLocaleString('zh-CN');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const P=id=>S.products.find(p=>p.id===id);
-const num=v=>{const n=parseFloat(v);return isNaN(n)?0:n};
+const num=v=>{const s=String(v==null?'':v).trim();if(!s)return 0;const n=Number(s);return Number.isFinite(n)?n:0};
+// ===== 输入边界校验 & 旧数据清洗 =====
+function chkQty(v,label){
+  const s=String(v==null?'':v).trim();
+  if(!/^\d+$/.test(s))return {ok:false,msg:(label||'条数')+'请填 0 或正整数，不要填小数、负号或文字'};
+  const n=Number(s);
+  if(n>MAX_QTY)return {ok:false,msg:(label||'条数')+'不能超过 '+MAX_QTY+'，请检查是否多输了 0'};
+  return {ok:true,val:n};
+}
+function chkMoney(v,label,allowNeg){
+  const s=String(v==null?'':v).trim();
+  if(!s)return {ok:true,val:0,empty:true};
+  if(!/^-?\d+(\.\d{1,2})?$/.test(s))return {ok:false,msg:(label||'金额')+'请填数字，最多两位小数'};
+  const n=Number(s);
+  if(!allowNeg&&n<0)return {ok:false,msg:(label||'金额')+'不能填负数'};
+  if(Math.abs(n)>MAX_MONEY)return {ok:false,msg:(label||'金额')+'数值过大，请检查是否多输了 0'};
+  return {ok:true,val:n,empty:false};
+}
+function chkProdForm(pre){
+  const name=$('#'+pre+'_name').value.trim();
+  if(!name)return '请填写品名。';
+  if(name.length>60)return '品名不能超过 60 个字。';
+  const fields=[['烟草批发价','cost'],['烟贩进货价','cost2'],['建议零售价','retail'],['红旗售价','actual']];
+  for(let i=0;i<fields.length;i++){
+    const r=chkMoney($('#'+pre+'_'+fields[i][1]).value,fields[i][0],false);
+    if(!r.ok)return r.msg;
+  }
+  if(['在售','紧缺','停供'].indexOf($('#'+pre+'_status').value)<0)return '货源状态不合法。';
+  if($('#'+pre+'_note').value.trim().length>200)return '备注不能超过 200 个字。';
+  return '';
+}
+function sanitize(){
+  if(!Array.isArray(S.products))S.products=[];
+  if(!S.log||typeof S.log!=='object')S.log={};
+  if(!S.adjust||typeof S.adjust!=='object')S.adjust={};
+  Object.keys(S.log).forEach(k=>{
+    if(k!=='batches'&&(!S.log[k]||typeof S.log[k]!=='object'))S.log[k]={};
+  });
+  S.products.forEach(p=>{
+    p.name=String(p.name||'').slice(0,60);
+    p.cost=Math.min(MAX_MONEY,Math.max(0,num(p.cost)));
+    p.cost2=Math.min(MAX_MONEY,Math.max(0,num(p.cost2)));
+    p.retail=Math.min(MAX_MONEY,Math.max(0,num(p.retail)));
+    p.actual=Math.min(MAX_MONEY,Math.max(0,num(p.actual)));
+    p.status=['在售','紧缺','停供'].indexOf(p.status)>=0?p.status:'在售';
+    p.note=String(p.note||'').slice(0,200);
+  });
+  months().forEach(m=>{
+    Object.keys(S.log[m]).forEach(id=>{
+      S.log[m][id]=flow(m,id).map(f=>({
+        b:Number.isFinite(Number(f.b))?Number(f.b):0,
+        src:f.src==='d'?'d':'t',
+        qty:Math.min(MAX_QTY,Math.max(0,Math.round(num(f.qty)))),
+        price:Math.min(MAX_MONEY,Math.max(0,num(f.price)))
+      })).filter(f=>f.qty>0);
+      if(!S.log[m][id].length)delete S.log[m][id];
+    });
+  });
+  Object.keys(S.adjust).forEach(m=>{
+    if(!Array.isArray(S.adjust[m])){delete S.adjust[m];return}
+    S.adjust[m]=S.adjust[m].filter(r=>r&&P(r.pid)).map(r=>({
+      id:Number(r.id)||1,
+      date:String(r.date||'').slice(0,10),
+      pid:r.pid,
+      qty:Math.min(MAX_QTY,Math.max(0,Math.round(num(r.qty)))),
+      amount:Math.max(-MAX_MONEY,Math.min(MAX_MONEY,num(r.amount))),
+      note:String(r.note||'').slice(0,200)
+    }));
+    if(!S.adjust[m].length)delete S.adjust[m];
+  });
+  S.schema=SCHEMA;
+}
+function delImpact(id){
+  let ms=0,fs=0;
+  months().forEach(m=>{const a=flow(m,id);if(a.length){ms++;fs+=a.length}});
+  let as=0;
+  if(S.adjust)Object.keys(S.adjust).forEach(m=>{as+=(S.adjust[m]||[]).filter(r=>r.pid===id).length});
+  return {ms,fs,as};
+}
+function batchImpact(m,id){
+  let ps=0,fs=0;
+  Object.keys(S.log[m]||{}).forEach(k=>{
+    if(k==='batches')return;
+    const a=flow(m,k).filter(f=>f.b===id);
+    if(a.length){ps++;fs+=a.length}
+  });
+  return {ps,fs};
+}
 
 function flow(m,id){const v=S.log[m]&&S.log[m][id];return Array.isArray(v)?v:[]}
 const months=()=>Object.keys(S.log).filter(k=>k!=='batches');
@@ -260,7 +350,7 @@ function touch(){
 function save(){
   try{
     const {batches,rest}=splitLog(S.log);
-    localStorage.setItem(KEY,JSON.stringify(Object.assign({},S,{log:rest,_batches:batches})));
+    localStorage.setItem(KEY,JSON.stringify(Object.assign({},S,{log:rest,_batches:batches,schema:SCHEMA})));
     status='已保存';
   }catch(e){
     status='保存失败：'+(e&&e.name==='QuotaExceededError'?'存储空间已满':'未知错误');
@@ -277,7 +367,7 @@ function meta(){
 }
 function exportData(){
   const {batches,rest}=splitLog(S.log);
-  const blob=new Blob([JSON.stringify(Object.assign({},S,{log:rest,_batches:batches}),null,2)],{type:'application/json'});
+  const blob=new Blob([JSON.stringify(Object.assign({},S,{log:rest,_batches:batches,schema:SCHEMA}),null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download='香烟进销记录-'+new Date().toISOString().slice(0,10)+'.json';
@@ -288,11 +378,20 @@ function importData(file){
   r.onload=()=>{
     try{
       const d=JSON.parse(r.result);
-      if(!d||!Array.isArray(d.products)||typeof d.log!=='object')throw new Error('格式不对');
-      if(!confirm('导入将覆盖当前全部数据，确定继续？'))return;
+      if(!d||!Array.isArray(d.products)||!d.log||typeof d.log!=='object')throw new Error('格式不对');
+      const vs=d.schema==null?0:Number(d.schema);
+      let note='';
+      if(!Number.isFinite(vs)||vs<1)note='\n\n⚠️ 这份备份没有版本号（旧版导出），会按当前格式自动兼容导入。';
+      else if(vs>SCHEMA)note='\n\n⚠️ 这份备份来自更新的格式（v'+vs+'），本文件是 v'+SCHEMA+'，可能读不全新字段，建议先留着原文件别删。';
+      else if(vs<SCHEMA)note='\n\n这是 v'+vs+' 的旧备份，会自动升级到 v'+SCHEMA+'。';
+      if(!confirm('导入将覆盖当前全部数据，确定继续？'+note))return;
       S=d;S.adjust=S.adjust||{};
       if(S._batches){S.log.batches=S._batches;delete S._batches}
-      migrate();save();render();alert('导入成功');
+      migrate();sanitize();
+      edit=null;delId=null;editor=false;bEdit=null;bDel=null;aEdit=null;aDel=null;
+      bSel='all';ss('bsel_'+month,'all');
+      pick={open:false,q:'',pid:null,newProd:false,newName:''};
+      save();render();alert('导入成功'+(note?'（已完成兼容处理）':''));
     }catch(e){alert('导入失败：'+e.message)}
   };
   r.readAsText(file);
@@ -302,30 +401,91 @@ function tabs(){
 }
 
 function setQty(m,id,src,b,q,price){
-  q=Math.max(0,q|0);
+  const qn=Number(q);q=Number.isFinite(qn)?Math.min(MAX_QTY,Math.max(0,Math.round(qn))):0;
   const keep=flow(m,id).filter(f=>!(inB(f,b)&&f.src===src));
-  if(q>0)keep.push({b:b==='all'?0:b,src,qty:q,price:Math.max(0,num(price))});
+  if(q>0)keep.push({b:b==='all'?0:b,src,qty:q,price:Math.min(MAX_MONEY,Math.max(0,num(price)))});
   S.log[m]=S.log[m]||{};
   S.log[m][id]=keep;
   if(!keep.length)delete S.log[m][id];
 }
 function setPrice(m,id,src,b,price){
+  const r=chkMoney(price,'进货单价',false);
+  if(!r.ok)return false;
   const f=flow(m,id).find(f=>inB(f,b)&&f.src===src);
-  if(f)f.price=Math.max(0,num(price));
+  if(f)f.price=r.val;
+  return true;
 }
 
+// ===== 品名实时查重 & 烟品表单（目录页 / 录入面板共用） =====
+function dupOf(name,excludeId){
+  const n=String(name||'').trim().toLowerCase();
+  if(!n)return null;
+  return S.products.find(p=>String(p.name||'').trim().toLowerCase()===n&&p.id!==excludeId)||null;
+}
+function matchNames(kw,excludeId){
+  const k=String(kw||'').trim().toLowerCase();
+  if(!k)return [];
+  return S.products.filter(p=>p.id!==excludeId&&String(p.name||'').toLowerCase().includes(k)).slice(0,6);
+}
+function nameHint(name,excludeId){
+  const n=String(name||'').trim();
+  if(!n)return '<span class="mu">输入品名时，这里会实时检查是否与目录里已保存的烟品重复</span>';
+  const dup=dupOf(n,excludeId);
+  if(dup)return '<span class="err">⚠️ 重名：目录里已有「'+esc(dup.name)+'」，请换个名字，或直接选用已有条目</span>';
+  const ms=matchNames(n,excludeId);
+  const near=ms.length?'<div style="margin-top:4px"><span class="mu">目录里相近的条目：</span><br>'+
+    ms.map(x=>'<span class="tag" style="display:inline-block;margin:2px 4px 0 0">'+esc(x.name)+'</span>').join('')+'</div>':'';
+  return '<span class="ok">✓ 没有重名，可以保存</span>'+near;
+}
+function refreshNameHint(){
+  const f=$('#f_name'),fb=$('#f_hint');
+  if(f&&fb)fb.innerHTML=nameHint(f.value,edit==='new'?null:edit);
+  const q=$('#qp_name'),qb=$('#qp_hint');
+  if(q&&qb)qb.innerHTML=nameHint(q.value,null);
+}
+function prodFields(p,pre){
+  return '<div class="grid">'+
+    '<div class="full"><input id="'+pre+'_name" placeholder="名称，如 黄鹤楼（软蓝）" value="'+esc(p.name)+'" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>'+
+    '<div class="full"><div id="'+pre+'_hint" class="mu" style="margin-top:-2px"></div></div>'+
+    '<div><span class="mu">烟草批发价（元/条）</span><input id="'+pre+'_cost" type="number" step="0.1" min="0" value="'+esc(p.cost)+'"></div>'+
+    '<div><span class="mu">烟贩进货价（元/条）</span><input id="'+pre+'_cost2" type="number" step="0.1" min="0" placeholder="选填" value="'+esc(p.cost2||'')+'"></div>'+
+    '<div><span class="mu">建议零售价（元/包）</span><input id="'+pre+'_retail" type="number" step="0.5" min="0" value="'+esc(p.retail)+'"></div>'+
+    '<div><span class="mu">红旗售价（元/条）</span><input id="'+pre+'_actual" type="number" step="1" min="0" placeholder="选填" value="'+esc(p.actual||'')+'"></div>'+
+    '<div class="full"><span class="mu">货源状态</span><select id="'+pre+'_status">'+['在售','紧缺','停供'].map(s=>'<option'+(p.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'+
+    '<div class="full"><input id="'+pre+'_note" placeholder="备注，如 本月投放减少" value="'+esc(p.note)+'"></div>'+
+  '</div>';
+}
+function readProd(pre){
+  return {
+    name:$('#'+pre+'_name').value.trim(),
+    cost:num($('#'+pre+'_cost').value),
+    cost2:$('#'+pre+'_cost2').value===''?0:num($('#'+pre+'_cost2').value),
+    retail:num($('#'+pre+'_retail').value),
+    actual:$('#'+pre+'_actual').value===''?0:num($('#'+pre+'_actual').value),
+    status:$('#'+pre+'_status').value||'在售',
+    note:$('#'+pre+'_note').value.trim()
+  };
+}
 function pickListHTML(){
-  const kw=pick.q.trim().toLowerCase();
+  const kw=pick.q.trim().toLowerCase(), typed=pick.q.trim();
   const all=S.products.filter(p=>p.status!=='停供');
-  if(!all.length)return '<div class="mu" style="margin-top:8px">还没有烟品。先到「烟品目录」添加。</div>';
-  const list=kw?all.filter(p=>p.name.toLowerCase().includes(kw)):all;
-  if(!list.length)return '<div class="mu" style="margin-top:8px">没找到「'+esc(pick.q)+'」，换个关键词，或到烟品目录新增。</div>';
-  let h='<div class="pick">'+list.slice(0,8).map(p=>
-    '<div class="bitem" data-act="pick" data-v="'+p.id+'"><span class="no">'+esc(p.name.slice(0,2))+'</span>'+
-    '<span class="nt">'+esc(p.name)+'</span>'+
-    '<span class="q">烟草 '+fmt(p.cost)+(p.cost2?' · 烟贩 '+fmt(p.cost2):'')+'</span></div>'
-  ).join('')+'</div>';
-  if(list.length>8)h+='<div class="mu" style="margin-top:6px">还有 '+(list.length-8)+' 条，继续输入关键词缩小范围。</div>';
+  const addBtn=txt=>'<div style="margin-top:8px"><button data-act="quickNew" style="font-size:12px;padding:5px 10px">＋ '+esc(txt)+'</button>'+
+    ' <span class="mu" style="font-size:11px">直接新增并保存到「烟品目录」</span></div>';
+  if(!all.length)return '<div class="mu" style="margin-top:8px">烟品目录还是空的，可以直接在这里新增：</div>'+addBtn('新增一款烟品');
+  const list=kw?all.filter(p=>String(p.name||'').toLowerCase().includes(kw)):all;
+  let h='';
+  if(!list.length){
+    h+='<div class="mu" style="margin-top:8px">没找到「'+esc(typed)+'」</div>'+
+       addBtn(typed?('把「'+typed+'」新增到烟品目录'):'新增一款烟品');
+  }else{
+    h+='<div class="pick">'+list.slice(0,8).map(p=>
+      '<div class="bitem" data-act="pick" data-v="'+p.id+'"><span class="no">'+esc(String(p.name).slice(0,2))+'</span>'+
+      '<span class="nt">'+esc(p.name)+'</span>'+
+      '<span class="q">烟草 '+fmt(p.cost)+(p.cost2?' · 烟贩 '+fmt(p.cost2):'')+'</span></div>'
+    ).join('')+'</div>';
+    if(list.length>8)h+='<div class="mu" style="margin-top:6px">还有 '+(list.length-8)+' 条，继续输入关键词缩小范围。</div>';
+    h+=addBtn(typed?('另新增「'+typed+'」到目录'):'新增一款不在列表里的烟');
+  }
   return h;
 }
 function refreshAdjRef(){
@@ -346,6 +506,13 @@ function pickPanel(){
   const curBid=(bSel!=='all'&&bt(month,bSel))?bSel:(bts(month)[0]||{}).id;
   const bno=curBid?'第'+(sortedBatches(month).findIndex(x=>x.id===curBid)+1)+'次':'未选批次';
   let h='<div class="card"><div class="row"><b>录入本次开烟 · '+bno+'</b><button data-act="closePick" style="padding:3px 8px;font-size:12px">关闭</button></div>';
+  if(pick.newProd){
+    h+='<div class="row" style="margin-top:8px"><b>快速新增烟品</b><button data-act="quickCancel" style="padding:3px 8px;font-size:12px">返回搜索</button></div>'+
+      '<div class="mu" style="margin-top:4px">保存后会写进「烟品目录」，并自动选中这款继续录开烟数量。</div>'+
+      prodFields({name:pick.newName||pick.q.trim(),cost:'',cost2:'',retail:'',actual:'',status:'在售',note:''},'qp')+
+      '<div class="row" style="margin-top:8px"><button data-act="quickCancel">取消</button><button class="on" data-act="quickSave">保存并继续录入</button></div>';
+    return h+'</div>';
+  }
   if(pick.pid){
     const p=P(pick.pid);
     h+='<div class="row" style="margin-top:8px"><b>'+esc(p.name)+'</b><button data-act="repick" style="padding:3px 8px;font-size:12px">更换</button></div>'+
@@ -412,11 +579,13 @@ function viewLog(){
     h+='<div class="btot">'+SB.map((b,idx)=>'第'+(idx+1)+'次 <i>'+(b.date?b.date.slice(5).replace('-','/'):'—')+'</i> '+btQty(month,b.id)+' 条').join('<i>|</i>')+'</div>';
     h+='<div class="blist">'+SB.map((b,idx)=>{
       const q=btQty(month,b.id);
+      const bi=bDel===b.id?batchImpact(month,b.id):null;
+      const warn=bi?'<div class="err" style="font-size:11px;margin-top:2px">⚠️ 再点一次将删除该批次，并连带清掉 '+bi.ps+' 款烟的 '+bi.fs+' 笔进货记录，无法撤销。</div>':'';
       return '<div class="bitem"><span class="no">'+(idx+1)+'</span>'+
         '<span class="dt">'+(b.date?b.date.slice(5).replace('-','/')+' 日':'未填日期')+'</span>'+
         '<span class="nt">'+(b.note?esc(b.note):'<span class="mu">无备注</span>')+'</span>'+
         '<span class="q">'+q+' 条</span>'+
-        '<button data-act="editB" data-v="'+b.id+'">编辑</button><button data-act="delB" data-v="'+b.id+'">'+(bDel===b.id?'再点确认':'删除')+'</button></div>';
+        '<button data-act="editB" data-v="'+b.id+'">编辑</button><button data-act="delB" data-v="'+b.id+'">'+(bDel===b.id?'再点确认删除':'删除')+'</button></div>'+warn;
     }).join('')+'</div>';
     h+='<button data-act="openPick" style="width:100%;margin-top:8px">＋ 录入本次开烟</button>';
   }else{
@@ -534,14 +703,8 @@ function viewProd(){
   if(!edit)h+='<button data-act="new" style="width:100%;margin-bottom:10px">＋ 添加烟品</button>';
   if(edit){
     const p=edit==='new'?{name:'',cost:'',cost2:'',retail:'',actual:'',status:'在售',note:''}:P(edit);
-    h+='<div class="card"><b>'+(edit==='new'?'添加烟品':'编辑烟品')+'</b><div class="grid">'+
-      '<div class="full"><input id="f_name" placeholder="名称，如 黄鹤楼（软蓝）" value="'+esc(p.name)+'"></div>'+
-      '<div><span class="mu">烟草批发价（元/条）</span><input id="f_cost" type="number" step="0.1" min="0" value="'+esc(p.cost)+'"></div>'+
-      '<div><span class="mu">烟贩进货价（元/条）</span><input id="f_cost2" type="number" step="0.1" min="0" placeholder="选填" value="'+esc(p.cost2||'')+'"></div>'+
-      '<div><span class="mu">建议零售价（元/包）</span><input id="f_retail" type="number" step="0.5" min="0" value="'+esc(p.retail)+'"></div>'+
-      '<div><span class="mu">红旗售价（元/条）</span><input id="f_actual" type="number" step="1" min="0" placeholder="选填" value="'+esc(p.actual||'')+'"></div>'+
-      '<div class="full"><span class="mu">货源状态</span><select id="f_status">'+['在售','紧缺','停供'].map(s=>'<option'+(p.status===s?' selected':'')+'>'+s+'</option>').join('')+'</select></div>'+
-      '<div class="full"><input id="f_note" placeholder="备注，如 本月投放减少" value="'+esc(p.note)+'"></div></div>'+
+    h+='<div class="card"><b>'+(edit==='new'?'添加烟品':'编辑烟品')+'</b>'+
+      prodFields(p,'f')+
       '<div class="row"><button data-act="cancel">取消</button><button class="on" data-act="saveP">确定</button></div></div>';
   }
 
@@ -562,10 +725,12 @@ function viewProd(){
 
   sorted.forEach(p=>{
     const m=p.retail*10-p.cost;
+    const di=delId===p.id?delImpact(p.id):null;
     const avg=avgOf(p);
     const avgTxt=p.status==='停供'?'':(avg>0?' · 月均 <span class="ok">'+fmt(avg)+'</span> 条':'');
     h+='<div class="card"><div class="row"><b>'+esc(p.name)+' <span class="tag'+(p.status!=='在售'?' warn':'')+'">'+p.status+'</span></b>'+
-    '<span><button data-act="edit" data-v="'+p.id+'">编辑</button> <button data-act="del" data-v="'+p.id+'">'+(delId===p.id?'再点确认':'删除')+'</button></span></div>'+
+    '<span><button data-act="edit" data-v="'+p.id+'">编辑</button> <button data-act="del" data-v="'+p.id+'">'+(delId===p.id?'再点确认删除':'删除')+'</button></span></div>'+
+    (di?'<div class="err" style="font-size:12px;margin-top:6px">⚠️ 再点一次将永久删除「'+esc(p.name)+'」，并连带清掉 '+di.ms+' 个月份的 '+di.fs+' 笔进货流水'+(di.as?'、'+di.as+' 笔特殊处置':'')+'，无法撤销。若只是不再卖了，建议改为「停供」保留历史。</div>':'')+
     '<div class="mu">烟草 '+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议零售 '+fmt(p.retail)+'/包（'+fmt(p.retail*10)+'/条）· 红旗 '+fmt(flagOf(p))+'/条</div>'+
     '<div class="mu">建议价毛利 '+fmt(m)+'/条'+(p.actual?' · 红旗毛利 <span class="'+(p.actual-p.cost>=0?'ok':'err')+'">'+fmt(p.actual-p.cost)+'</span>/条':'')+(p.cost2?' · 烟贩价利润 <span class="'+(flagOf(p)-p.cost2>=0?'ok':'err')+'">'+fmt(flagOf(p)-p.cost2)+'</span>/条':'')+
     avgTxt+
@@ -585,35 +750,40 @@ function scrollChipIntoView(){
 
 function render(){
   meta();
+  // 交互状态若还指向已被删除 / 已不存在的烟品或批次，先复位，避免渲染时报错白屏
+  if(pick.pid&&!P(pick.pid))pick={open:false,q:'',pid:null,newProd:false,newName:''};
+  if(edit&&edit!=='new'&&!P(edit)){edit=null;delId=null}
+  if(bSel!=='all'&&!bt(month,bSel))bSel='all';
   $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
-  if(pick.open&&!pick.pid){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+  if(pick.open&&!pick.pid&&!pick.newProd){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
   if(aEdit)refreshAdjRef();
+  refreshNameHint();
   requestAnimationFrame(()=>{requestAnimationFrame(scrollChipIntoView)});
 }
 
 let composing=false;
-document.addEventListener('compositionstart',e=>{
-  if(e.target.id==='pk_q')composing=true;
-});
+const typingId=id=>id==='pk_q'||id==='f_name'||id==='qp_name';
+document.addEventListener('compositionstart',e=>{ if(typingId(e.target.id))composing=true; });
 document.addEventListener('compositionend',e=>{
-  if(e.target.id==='pk_q'){
-    composing=false;
-    pick.q=e.target.value;
-    refreshPickList();
-  }
+  composing=false;
+  const id=e.target.id;
+  if(id==='pk_q'){pick.q=e.target.value;refreshPickList()}
+  else if(id==='f_name'||id==='qp_name')refreshNameHint();
 });
 document.addEventListener('input',e=>{
-  if(e.target.id==='pk_q'){
+  const id=e.target.id;
+  if(id==='pk_q'){
     pick.q=e.target.value;
     if(!composing)refreshPickList();
   }
-  if(e.target.id==='a_qty'||e.target.id==='a_pid')refreshAdjRef();
+  if((id==='f_name'||id==='qp_name')&&!composing)refreshNameHint();
+  if(id==='a_qty'||id==='a_pid')refreshAdjRef();
 });
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='mo'&&t.value){
     month=t.value;ss('month',month);bSel=ss('bsel_'+month)||'all';
-    bEdit=null;bDel=null;edit=null;pick={open:false,q:'',pid:null};
+    bEdit=null;bDel=null;edit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};
     render();return;
   }
   if(t.dataset&&t.dataset.act==='price'){
@@ -622,7 +792,10 @@ document.addEventListener('change',e=>{
       render();
       return;
     }
-    setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value);
+    if(!setPrice(month,t.dataset.v,t.dataset.src,curB(),t.value)){
+      alert('进货单价请填数字，最多两位小数，且不能为负数。');
+      render();return;
+    }
     touch();
   }
   if(t.id==='a_pid'||t.id==='a_qty')refreshAdjRef();
@@ -633,7 +806,7 @@ document.addEventListener('focusout',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.target.id==='pk_q'){
-    if(e.key==='Escape'){pick={open:false,q:'',pid:null};render()}
+    if(e.key==='Escape'){pick={open:false,q:'',pid:null,newProd:false,newName:''};render()}
     if(e.key==='Enter'){
       const kw=pick.q.trim().toLowerCase();
       const list=S.products.filter(p=>p.status!=='停供'&&(!kw||p.name.toLowerCase().includes(kw)));
@@ -657,7 +830,7 @@ document.addEventListener('click',e=>{
   const a=b.dataset.act,src=b.dataset.src;
   let v=b.dataset.v;
   if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
-  if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null};render();return}
+  if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();return}
   if(a==='selB'){bSel=v;ss('bsel_'+month,v);bEdit=null;bDel=null;render();return}
   if(a==='export'){exportData();return}
   if(a==='import'){$('#impFile').click();return}
@@ -666,13 +839,27 @@ document.addEventListener('click',e=>{
       alert('请先选择一个具体批次，再录入开烟记录。');
       return;
     }
-    pick={open:true,q:'',pid:null};
+    pick={open:true,q:'',pid:null,newProd:false,newName:''};
     bSel=curB();
     ss('bsel_'+month,bSel);
     render();
     return;
 }
-  if(a==='closePick'){pick={open:false,q:'',pid:null};render();return}
+  if(a==='quickNew'){
+    pick.newName=(pick.q||'').trim();pick.newProd=true;pick.pid=null;render();return
+  }
+  if(a==='quickCancel'){pick.newProd=false;pick.newName='';render();return}
+  if(a==='quickSave'){
+    const err=chkProdForm('qp');if(err){alert(err);return}
+    const d=readProd('qp');
+    const dup=dupOf(d.name,null);
+    if(dup){alert('目录里已经有同名烟品了：'+dup.name+'。请换个名字，或点「返回搜索」直接选它。');return}
+    const np=Object.assign({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)},d);
+    S.products.push(np);
+    pick.newProd=false;pick.newName='';pick.pid=np.id;pick.q='';
+    touch();render();return
+  }
+  if(a==='closePick'){pick={open:false,q:'',pid:null,newProd:false,newName:''};render();return}
   if(a==='repick'){pick.pid=null;pick.q='';render();return}
   if(a==='pick'){pick.pid=v;pick.q='';render();return}
   if(a==='inc'||a==='dec'){
@@ -714,10 +901,15 @@ document.addEventListener('click',e=>{
     aEdit=true;aDel=null;render();return
   }else if(a==='adjCancel'){aEdit=null;render();return}
   else if(a==='adjSave'){
-    const pid=$('#a_pid').value,q=Math.max(0,num($('#a_qty').value)|0);
-    if(!pid||!q){alert('请选择烟品，并填写条数。');return}
-    const raw=$('#a_amt').value.trim(),p0=P(pid);
-    const amt=raw===''?q*(p0?p0.cost:0):num(raw);
+    const pid=$('#a_pid').value;
+    const qc=chkQty($('#a_qty').value,'条数');
+    if(!qc.ok){alert(qc.msg);return}
+    if(!pid||!qc.val){alert('请选择烟品，并填写条数。');return}
+    const q=qc.val,p0=P(pid);
+    if(!p0){alert('这款烟已不存在，请重新选择。');return}
+    const ac=chkMoney($('#a_amt').value,'实际抵 / 换到的金额',true);
+    if(!ac.ok){alert(ac.msg);return}
+    const amt=ac.empty?q*p0.cost:ac.val;
     S.adjust=S.adjust||{};
     const arr=S.adjust[month]=S.adjust[month]||[];
     const id=arr.reduce((x,r)=>Math.max(x,r.id),0)+1;
@@ -732,17 +924,11 @@ document.addEventListener('click',e=>{
   else if(a==='edit'){edit=v;render()}
   else if(a==='cancel'){edit=null;render()}
   else if(a==='saveP'){
-    const name=$('#f_name').value.trim();if(!name)return;
-    const dup=S.products.find(p=>p.name===name&&p.id!==edit);
+    const err=chkProdForm('f');if(err){alert(err);return}
+    const d=readProd('f');
+    const dup=dupOf(d.name,edit==='new'?null:edit);
     if(dup){alert('已经有同名烟品了：'+dup.name);return}
-    const d={name,
-      cost:num($('#f_cost').value),
-      cost2:$('#f_cost2').value===''?0:num($('#f_cost2').value),
-      retail:num($('#f_retail').value),
-      actual:$('#f_actual').value===''?0:num($('#f_actual').value),
-      status:$('#f_status').value,
-      note:$('#f_note').value.trim()};
-    if(edit==='new')S.products.push(Object.assign({id:'p'+Date.now().toString(36)},d));
+    if(edit==='new')S.products.push(Object.assign({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)},d));
     else Object.assign(P(edit),d);
     edit=null;touch();render();
   }else if(a==='del'){
@@ -761,6 +947,7 @@ document.addEventListener('click',e=>{
 });
 
 migrate();
+sanitize();
 render();
   
 </script>
