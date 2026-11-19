@@ -175,6 +175,8 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .srow{border:1px solid var(--ln);border-radius:8px;padding:6px 8px;font-size:12px;min-width:0}
 .srow .nt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srow .q{color:var(--mu);font-variant-numeric:tabular-nums}
+/* 全屏 webapp：把标题从状态栏虚化区挪开 */
+body{padding-top:calc(28px + env(safe-area-inset-top, 0px))}
 </style>
 </head>
 <body>
