@@ -320,9 +320,15 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .adbody{display:grid;gap:7px;margin-top:8px;border-top:1px dashed var(--ln);padding-top:8px;min-width:0}
 
 #mo{
-  position:sticky;top:0;z-index:5;
-  margin-bottom:14px;
-  box-shadow:0 10px 0 0 var(--bg),0 11px 0 0 var(--ln);
+  position:sticky;
+  top:0;
+  z-index:5;
+  background:var(--bg);
+  margin:0 0 12px 0;
+  padding:10px 0 12px;
+  /* 用足够高的实心阴影盖住下方滚动内容，消除缝隙透底 */
+  box-shadow:0 16px 0 0 var(--bg);
+  border-bottom:1px solid var(--ln);
 }
 *{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 html,body{-webkit-text-size-adjust:100%}
@@ -938,8 +944,10 @@ function viewLog(){
   const tot=rows.reduce((a,p)=>{
     const n=qty(month,p.id);
     a.n+=n;a.c+=costOf(month,p.id);a.r+=n*p.retail*10;a.f+=n*flagOf(p);
+    a.tc+=srcCost(month,p.id,'all','t');
+    a.dc+=srcCost(month,p.id,'all','d');
     return a;
-  },{n:0,c:0,r:0,f:0});
+  },{n:0,c:0,r:0,f:0,tc:0,dc:0});
   const dp=dProfit(month),est=tot.f-tot.c,adj=adjImpact(month),real=est-adj;
   const adjTxt=Math.abs(adj)<0.005?'特殊处置无影响'
     :(adj>0?'已扣特殊处置 '+fmt(adj)+' 元':'特殊处置反加 '+fmt(-adj)+' 元');
@@ -981,7 +989,16 @@ function viewLog(){
   const col=x=>x>=0?'ok':'err';
   h+='<div class="hero"><div class="hl"><span class="mu">接近真实利润（元）</span><b class="big '+col(real)+'">'+sg(real)+'</b><span class="mu">'+adjTxt+'</span></div>'+
     '<div class="hl r"><span class="mu">本月开烟（条）</span><b class="big">'+tot.n+'</b></div></div>'+
-    '<div class="dense">'+[['进货成本',fmt(tot.c)],['按建议价销售额',fmt(tot.r)],['理论毛利',sg(tot.r-tot.c),tot.r-tot.c],['红旗售价销售额',fmt(tot.f)],['烟贩价利润（仅烟贩渠道）',sg(dp),dp],['估算利润（未计还款 / 换烟）',sg(est),est]].map(x=>'<div class="dr"><span class="mu">'+x[0]+'</span><b class="'+(x.length>2?col(x[2]):'')+'">'+x[1]+'</b></div>').join('')+'</div>';
+    '<div class="dense">'+[
+      ['进货成本（合计）',fmt(tot.c)],
+      ['　烟草局进货',fmt(tot.tc)],
+      ['　烟贩进货',fmt(tot.dc)],
+      ['按建议价销售额',fmt(tot.r)],
+      ['理论毛利',sg(tot.r-tot.c),tot.r-tot.c],
+      ['红旗售价销售额',fmt(tot.f)],
+      ['烟贩价利润（仅烟贩渠道）',sg(dp),dp],
+      ['估算利润（未计还款 / 换烟）',sg(est),est]
+    ].map(x=>'<div class="dr"><span class="mu">'+x[0]+'</span><b class="'+(x.length>2?col(x[2]):'')+'">'+x[1]+'</b></div>').join('')+'</div>';
 
   h+=viewAdj();
 
@@ -1096,20 +1113,23 @@ function sumAxis(){
 // 口径与首页四行 KPI 完全一致，保证「接近真实利润」能对上账
 function sumStat(m){
   const rows=S.products.filter(p=>qty(m,p.id)>0);
-  let n=0,c=0,f=0,r=0,t=0,d=0;
+  let n=0,c=0,f=0,r=0,t=0,d=0,tc=0,dc=0;
   rows.forEach(p=>{
     const q=qty(m,p.id);
     n+=q;c+=costOf(m,p.id);f+=q*flagOf(p);r+=q*p.retail*10;
     t+=bqtyOf(m,p.id,'all','t');d+=bqtyOf(m,p.id,'all','d');
+    tc+=srcCost(m,p.id,'all','t');dc+=srcCost(m,p.id,'all','d');
   });
   const est=f-c,adj=adjImpact(m);
-  return {rows,n,c,f,r,t,d,est,adj,real:est-adj,dp:dProfit(m)};
+  return {rows,n,c,f,r,t,d,tc,dc,est,adj,real:est-adj,dp:dProfit(m)};
 }
 function sumDetail(m,st){
   let x='<div class="sbody">';
-  x+='<div class="sline"><span class="mu">进货成本 / 红旗销售额 / 按建议价销售额</span><b>'+fmt(st.c)+' / '+fmt(st.f)+' / '+fmt(st.r)+' 元</b></div>';
+  x+='<div class="sline"><span class="mu">进货成本（合计）</span><b>'+fmt(st.c)+' 元</b></div>';
+  x+='<div class="sline"><span class="mu">　烟草局进货 / 烟贩进货</span><b>'+fmt(st.tc)+' / '+fmt(st.dc)+' 元</b></div>';
+  x+='<div class="sline"><span class="mu">红旗销售额 / 按建议价销售额</span><b>'+fmt(st.f)+' / '+fmt(st.r)+' 元</b></div>';
   x+='<div class="sline"><span class="mu">烟贩价利润（仅烟贩渠道）</span><b>'+fmt(st.dp)+' 元</b></div>';
-  x+='<div class="sline"><span class="mu">渠道拆分</span><span>烟草 '+st.t+' 条 · 烟贩 '+st.d+' 条</span></div>';
+  x+='<div class="sline"><span class="mu">渠道条数</span><span>烟草 '+st.t+' 条 · 烟贩 '+st.d+' 条</span></div>';
   const orig=new Map(st.rows.map((p,i)=>[p.id,i]));
   const sorted=st.rows.slice().sort((a,b)=>qty(m,b.id)-qty(m,a.id)||orig.get(a.id)-orig.get(b.id));
   if(sorted.length){
