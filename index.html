@@ -181,7 +181,8 @@ body{font-variant-numeric:tabular-nums}
 button.on,.tabs button.on,.chip.on{background:var(--ink);border-color:var(--ink);color:var(--on)}
 #tabs{flex:0 0 auto;padding-top:8px;border-top:1px solid var(--ln);background:var(--bg)}
 #tabs .tabs{margin-bottom:0}.tabs button{min-height:44px}
-#mo{position:sticky;top:0;z-index:5}
+#meta{display:flex;align-items:center;gap:6px;height:40px;white-space:nowrap;overflow-x:auto;scrollbar-width:none;margin-bottom:6px}
+#meta::-webkit-scrollbar{display:none}#meta button{min-height:30px}
 button{min-height:36px}.chip{min-height:34px}
 .step button{width:40px;height:40px}.src .step button{width:40px;height:40px;font-size:20px}
 .mu,.tag,.badge,.btot,.srcs .sum,.src .pr span,.skpi .mu,.ahd .ar,.shd .sa,.bitem,.aitem,.sline,.srow{font-size:12px}
@@ -197,6 +198,7 @@ button{min-height:36px}.chip{min-height:34px}
 .aday{border:1px solid var(--ln);border-radius:10px;padding:8px 10px;background:var(--card);min-width:0}
 .aday.on{border-color:var(--ink)}.aday>.ahd{font-size:13px}
 .adbody{display:grid;gap:6px;margin-top:8px;border-top:1px dashed var(--ln);padding-top:8px;min-width:0}
+#mo{position:sticky;top:0;z-index:5;margin-bottom:14px;box-shadow:0 8px 0 0 var(--bg),0 9px 0 0 var(--ln)}
 </style>
 </head>
 <body>
@@ -1014,10 +1016,12 @@ function render(){
   if(aEdit&&aEdit!==true&&adjIds.indexOf(aEdit)<0)aEdit=null;
   if(aDel&&adjIds.indexOf(aDel)<0)aDel=null;
   if(sumOpen&&!sumHas(sumOpen))sumOpen=null;
-  $('#tabs').innerHTML=tabs();$('#app').innerHTML=(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
-  if(pick.open&&!pick.pid&&!pick.newProd){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
+  const app=$('#app'),st0=app.scrollTop;
+  $('#tabs').innerHTML=tabs();app.innerHTML=(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
+  if(pick.focus&&pick.open&&!pick.pid&&!pick.newProd){pick.focus=false;const el=$('#pk_q');if(el){el.focus({preventScroll:true});el.setSelectionRange(el.value.length,el.value.length)}}
   if(aEdit)refreshAdjRef();
   refreshNameHint();refreshRetailTip();
+  app.scrollTop=st0;
   requestAnimationFrame(()=>{requestAnimationFrame(scrollChipIntoView)});
 }
 
@@ -1092,7 +1096,7 @@ document.addEventListener('click',e=>{
   const a=b.dataset.act,src=b.dataset.src;
   let v=b.dataset.v;
   if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
-  if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();return}
+  if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();$('#app').scrollTop=0;return}
   if(a==='cardToggle'){cardOpen=(cardOpen===v?null:v);render();return}
   if(a==='adjDay'){aDay=(aDay===v?null:v);aOpen=null;if(aEdit!==true)aEdit=null;aDel=null;render();return}
   if(a==='sumToggle'){sumOpen=(sumOpen===v?null:v);render();return}
@@ -1104,7 +1108,7 @@ document.addEventListener('click',e=>{
       alert('请先选择一个具体批次，再录入开烟记录。');
       return;
     }
-    pick={open:true,q:'',pid:null,newProd:false,newName:''};
+    pick={open:true,q:'',pid:null,newProd:false,newName:'',focus:true};
     bSel=curB();
     ss('bsel_'+month,bSel);
     render();
@@ -1113,7 +1117,7 @@ document.addEventListener('click',e=>{
   if(a==='quickNew'){
     pick.newName=(pick.q||'').trim();pick.newProd=true;pick.pid=null;render();return
   }
-  if(a==='quickCancel'){pick.newProd=false;pick.newName='';render();return}
+  if(a==='quickCancel'){pick.newProd=false;pick.newName='';pick.focus=true;render();return}
   if(a==='quickSave'){
     const err=chkProdForm('qp');if(err){alert(err);return}
     const d=readProd('qp');
@@ -1125,7 +1129,7 @@ document.addEventListener('click',e=>{
     touch();render();return
   }
   if(a==='closePick'){pick={open:false,q:'',pid:null,newProd:false,newName:''};render();return}
-  if(a==='repick'){pick.pid=null;pick.q='';render();return}
+  if(a==='repick'){pick.pid=null;pick.q='';pick.focus=true;render();return}
   if(a==='pick'){pick.pid=v;pick.q='';render();return}
   if(a==='inc'||a==='dec'){
     if(bSel==='all'){
