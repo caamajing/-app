@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>香烟进销记录</title>
 <style>
 :root{--bg:#faf8f4;--card:#fff;--tx:#1d1b18;--mu:#7a746a;--ln:#e6e0d6;--ac:#b3402a;--ok:#2f7d4f;--warn:#c07d18;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -172,22 +172,47 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .dprice .tag{font-size:11px;padding:1px 6px;border-radius:8px;border:1px solid var(--ln);color:var(--mu)}
 .dprice .tag.warn{color:var(--ac);border-color:var(--ac)}
 .dtags{display:flex;flex-wrap:wrap;gap:4px;width:100%;min-width:0;margin-top:2px}
+
+/* ===== v3 视觉层级调整 ===== */
+:root{--ink:#2a2723;--on:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#efe9df;--on:#171513}}
+:root[data-theme="dark"]{--ink:#efe9df;--on:#171513}
+body{font-variant-numeric:tabular-nums}
+button.on,.tabs button.on,.chip.on{background:var(--ink);border-color:var(--ink);color:var(--on)}
+#tabs{flex:0 0 auto;padding-top:8px;border-top:1px solid var(--ln);background:var(--bg)}
+#tabs .tabs{margin-bottom:0}.tabs button{min-height:44px}
+#mo{position:sticky;top:0;z-index:5}
+button{min-height:36px}.chip{min-height:34px}
+.step button{width:40px;height:40px}.src .step button{width:40px;height:40px;font-size:20px}
+.mu,.tag,.badge,.btot,.srcs .sum,.src .pr span,.skpi .mu,.ahd .ar,.shd .sa,.bitem,.aitem,.sline,.srow{font-size:12px}
+[style*="font-size:11px"]{font-size:12px!important}
+.hero{display:flex;gap:12px;align-items:flex-end;justify-content:space-between;margin:2px 0 8px;padding:4px 2px 10px;border-bottom:1px solid var(--ln)}
+.hl{display:flex;flex-direction:column;min-width:0}.hl.r{text-align:right;align-items:flex-end}
+.big{font-size:30px;line-height:1.15;letter-spacing:-.5px}
+.dense{margin-bottom:12px}.dr{display:flex;justify-content:space-between;gap:10px;padding:5px 2px;border-bottom:1px dotted var(--ln)}.dr b{font-weight:600}
+.pc .ph{cursor:pointer}.pc .n{font-size:20px}
+.bar2{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:8px}.bar2 i{display:block;height:100%}
+.bt{background:var(--ink)}.bd{background:var(--warn)}
+.lg{font-size:12px;color:var(--mu);display:flex;gap:14px;align-items:center;margin:0 2px 8px;flex-wrap:wrap}.lg i{display:inline-block;width:14px;height:6px;border-radius:3px;margin-right:4px;vertical-align:middle}
 </style>
 </head>
 <body>
 <h1>香烟进销记录</h1>
 <div class="sub" id="meta"></div>
 <div id="app"></div>
+<nav id="tabs"></nav>
 <script type="application/json" id="data">{"products":[],"log":{},"updated":""}</script>
 <script>
 const $=s=>document.querySelector(s);
 const KEY='ciglog_data_v2';
+let cardOpen=null;
 const SCHEMA=2;                       // 备份 / 本地数据格式版本
 const MAX_QTY=99999,MAX_MONEY=99999999;
+const rb=k=>{try{const v=sessionStorage.getItem(k);return v&&v!=='all'?Number(v):'all'}catch(e){return 'all'}};
 const ss=(k,v)=>{try{if(v===undefined)return sessionStorage.getItem(k);sessionStorage.setItem(k,v)}catch(e){}};
 const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 let tab=ss('tab')||'log',month=ss('month')||ym(new Date()),editor=false,edit=null,delId=null,status='',tm;
-let bSel=ss('bsel_'+month)||'all',bEdit=null,bDel=null,aEdit=null,aDel=null,aOpen=null,sumOpen=null;
+let bSel=rb('bsel_'+month),bEdit=null,bDel=null,aEdit=null,aDel=null,aOpen=null,sumOpen=null;
 let pick={open:false,q:'',pid:null,newProd:false,newName:''};
 
 function loadData(){
@@ -232,6 +257,7 @@ function migrate(){
 
 const fmt=n=>(Math.round(n*100)/100).toLocaleString('zh-CN');
 const fmt0=n=>Math.round(n).toLocaleString('zh-CN');
+const sg=n=>(n>0.004?'+':n<-0.004?'−':'')+fmt(Math.abs(n));
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const P=id=>S.products.find(p=>p.id===id);
 const num=v=>{const s=String(v==null?'':v).trim();if(!s)return 0;const n=Number(s);return Number.isFinite(n)?n:0};
@@ -466,7 +492,7 @@ function setPrice(m,id,src,b,price){
   const r=chkMoney(price,'进货单价',false);
   if(!r.ok)return false;
   const f=flow(m,id).find(f=>inB(f,b)&&f.src===src);
-  if(f)f.price=r.val;
+  if(f){const pp=P(id),def=pp?(src==='d'?(pp.cost2||pp.cost):pp.cost):0;f.price=r.empty?def:r.val}
   return true;
 }
 
@@ -707,19 +733,10 @@ function viewLog(){
 
   h+=pickPanel();
 
-  h+='<div class="kpi">'+
-    '<div><span class="mu">本月开烟（条）</span><b>'+tot.n+'</b></div>'+
-    '<div><span class="mu">进货成本（元）</span><b>'+fmt(tot.c)+'</b></div>'+
-    '<div><span class="mu">按建议价销售额</span><b>'+fmt(tot.r)+'</b></div>'+
-    '<div><span class="mu">理论毛利</span><b class="'+(tot.r-tot.c>=0?'ok':'err')+'">'+fmt(tot.r-tot.c)+'</b></div>'+
-    '<div><span class="mu">红旗售价销售额</span><b>'+fmt(tot.f)+'</b></div>'+
-    '<div><span class="mu">烟贩价利润</span><b class="'+(dp>=0?'ok':'err')+'">'+fmt(dp)+'</b>'+
-      '<span class="mu" style="display:block;font-size:11px">仅烟贩渠道进的烟</span></div>'+
-    '<div><span class="mu">估算利润</span><b class="'+(est>=0?'ok':'err')+'">'+fmt(est)+'</b>'+
-      '<span class="mu" style="display:block;font-size:11px">未计还款 / 换烟</span></div>'+
-    '<div><span class="mu">接近真实利润</span><b class="'+(real>=0?'ok':'err')+'">'+fmt(real)+'</b>'+
-      '<span class="mu" style="display:block;font-size:11px">'+adjTxt+'</span></div>'+
-    '</div>';
+  const col=x=>x>=0?'ok':'err';
+  h+='<div class="hero"><div class="hl"><span class="mu">接近真实利润（元）</span><b class="big '+col(real)+'">'+sg(real)+'</b><span class="mu">'+adjTxt+'</span></div>'+
+    '<div class="hl r"><span class="mu">本月开烟（条）</span><b class="big">'+tot.n+'</b></div></div>'+
+    '<div class="dense">'+[['进货成本',fmt(tot.c)],['按建议价销售额',fmt(tot.r)],['理论毛利',sg(tot.r-tot.c),tot.r-tot.c],['红旗售价销售额',fmt(tot.f)],['烟贩价利润（仅烟贩渠道）',sg(dp),dp],['估算利润（未计还款 / 换烟）',sg(est),est]].map(x=>'<div class="dr"><span class="mu">'+x[0]+'</span><b class="'+(x.length>2?col(x[2]):'')+'">'+x[1]+'</b></div>').join('')+'</div>';
 
   h+=viewAdj();
 
@@ -743,6 +760,7 @@ function viewLog(){
   const origOrder=new Map(rows.map((p,i)=>[p.id,i]));
   rows.sort((a,b)=>viewQty(b)-viewQty(a)||origOrder.get(a.id)-origOrder.get(b.id));
   const viewMx=Math.max(1,...rows.map(p=>viewQty(p)));
+  if(rows.length)h+='<div class="lg"><span><i class="bt"></i>烟草</span><span><i class="bd"></i>烟贩</span><span>点卡片展开明细</span></div>';
   rows.forEach((p,i)=>{
     const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
     const dq=bqtyOf(month,p.id,sb,'d'),dqCost=srcCost(month,p.id,sb,'d');
@@ -757,15 +775,13 @@ function viewLog(){
         (dq?' · 烟贩渠道利润（实付）<span class="'+(dq*flagOf(p)-dqCost>=0?'ok':'err')+'">'+fmt0(dq*flagOf(p)-dqCost)+'</span> 元':'')+
         (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
     '</div>';
-    const disp=showing?bn:n;
-    h+='<div class="card"><div class="row"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+
-'<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
-'<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b></div>'+
-'<div class="mu" style="margin-top:4px"><span style="color:var(--ac);font-weight:600">烟草 '+bqtyOf(month,p.id,sb,'t')+'</span> 条 · <span style="color:var(--ac);font-weight:600">烟贩 '+dq+'</span> 条</div>'+
-dPriceTags(month,p,sb)+
-body+(disp?'<div class="bar" style="width:'+(disp/viewMx*100)+'%"></div>':'')+
-'<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 8px;font-size:12px">'+(editor?'完成':'修改')+'</button></div>'+
-'</div>';
+    const disp=showing?bn:n,open=editor||cardOpen===p.id,tq=bqtyOf(month,p.id,sb,'t');
+    const bar=disp?'<div class="bar2" style="width:'+(disp/viewMx*100)+'%"><i class="bt" style="flex:'+tq+'"></i><i class="bd" style="flex:'+dq+'"></i></div>':'<div class="bar2"></div>';
+    h+='<div class="card pc"><div class="row ph" data-act="cardToggle" data-v="'+p.id+'"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+'</div>'+
+      '<span><b class="n">'+(showing?bn+' <span class="mu">/ 月 '+n+'</span>':n+' 条')+'</b> <span class="mu">'+(open?'▴':'▾')+'</span></span></div>'+bar+
+      (open?'<div class="mu" style="margin-top:8px">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div>'+
+        '<div class="mu">烟草 '+tq+' 条 · 烟贩 '+dq+' 条</div>'+dPriceTags(month,p,sb)+body+
+        '<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 10px;font-size:12px">'+(editor?'完成':'修改')+'</button></div>':'')+'</div>';
   });
   return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。<br>'+
     '烟贩徽标＝当前视图下烟贩渠道的加权实付均价（改过价会标红并列出与目录价的差额）；同一视图出现两种以上实付价时，自动展开逐批次价签。</div>';
@@ -871,6 +887,20 @@ function sumDetail(m,st){
   }
   return x+'</div>';
 }
+function trendSVG(axis){
+  const ms=axis.slice().reverse(),W=320,H=96,pl=4,pt=8,pb=18,iw=W-pl*2,ih=H-pt-pb,bw=iw/ms.length;
+  const st=ms.map(m=>sumHas(m)?sumStat(m):null),mxN=Math.max(1,...st.map(s=>s?s.n:0));
+  const rv=st.filter(Boolean).map(s=>s.real),lo=Math.min(0,...rv),hi=Math.max(0,...rv),sp=(hi-lo)||1;
+  const x=i=>pl+bw*i+bw/2,yr=v=>pt+ih*(1-(v-lo)/sp);
+  let bars='',pts=[],lab='';
+  ms.forEach((m,i)=>{const s=st[i];
+    if(s){const h2=ih*s.n/mxN;bars+='<rect x="'+(x(i)-bw*.3)+'" y="'+(pt+ih-h2)+'" width="'+bw*.6+'" height="'+h2+'" rx="2" fill="var(--mu)" opacity=".3"/>';pts.push([x(i),yr(s.real)])}
+    lab+='<text x="'+x(i)+'" y="'+(H-5)+'" text-anchor="middle" font-size="9" fill="var(--mu)">'+Number(m.slice(5))+'</text>'});
+  const line=pts.length>1?'<polyline points="'+pts.map(q=>q.join(',')).join(' ')+'" fill="none" stroke="var(--tx)" stroke-width="1.5"/>':'';
+  const dots=pts.map(q=>'<circle cx="'+q[0]+'" cy="'+q[1]+'" r="2.5" fill="var(--tx)"/>').join('');
+  const zero=lo<0?'<line x1="'+pl+'" x2="'+(W-pl)+'" y1="'+yr(0)+'" y2="'+yr(0)+'" stroke="var(--ln)"/>':'';
+  return '<div class="card" style="padding:10px 12px"><div class="mu">月度趋势 · 灰柱＝开烟条数（最高 '+mxN+' 条） · 黑线＝接近真实利润（'+fmt0(lo)+' 至 '+fmt0(hi)+' 元）</div><svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:6px">'+zero+bars+line+dots+lab+'</svg></div>';
+}
 function viewSum(){
   const axis=sumAxis();
   if(!axis.length)return '<div class="card mu">还没有月度记录。</div>';
@@ -880,10 +910,11 @@ function viewSum(){
   let h='<div class="card" style="padding:10px 12px"><div class="mu">最近 '+axis.length+' 个自然月 · 共 '+rec.length+' 个月有记录（空月留白）</div>'+
     '<div class="skpi" style="margin-top:6px">'+
       '<div><span class="mu">合计开烟</span><b>'+acc.n+' 条</b></div>'+
-      '<div><span class="mu">合计估算利润</span><b>'+fmt(acc.est)+' 元</b></div>'+
+      '<div><span class="mu">合计估算利润</span><b>'+sg(acc.est)+' 元</b></div>'+
       '<div><span class="mu">特殊处置净影响</span><b>'+adjDeltaHTML(acc.adj)+'</b></div>'+
-      '<div><span class="mu">合计接近真实利润</span><b>'+fmt(acc.real)+' 元</b></div>'+
+      '<div><span class="mu">合计接近真实利润</span><b>'+sg(acc.real)+' 元</b></div>'+
     '</div></div>';
+  h+=trendSVG(axis);
   h+='<div class="saxis">'+axis.map(m=>{
     const ym2=m.split('-'),y=ym2[0],mo=Number(ym2[1]);
     if(!sumHas(m))return '<div class="sempty">'+y+' 年 '+mo+' 月 · 无记录</div>';
@@ -896,9 +927,9 @@ function viewSum(){
       '</div>'+
       '<div class="skpi">'+
         '<div><span class="mu">开烟条数</span><b>'+st.n+' 条</b></div>'+
-        '<div><span class="mu">估算利润</span><b>'+fmt(st.est)+' 元</b></div>'+
+        '<div><span class="mu">估算利润</span><b>'+sg(st.est)+' 元</b></div>'+
         '<div><span class="mu">特殊处置</span><b>'+adjDeltaHTML(st.adj)+'</b></div>'+
-        '<div><span class="mu">接近真实利润</span><b class="'+(st.real>=0?'ok':'err')+'">'+fmt(st.real)+' 元</b></div>'+
+        '<div><span class="mu">接近真实利润</span><b class="'+(st.real>=0?'ok':'err')+'">'+sg(st.real)+' 元</b></div>'+
       '</div>'+
       (open?sumDetail(m,st):'')+
     '</div>';
@@ -971,7 +1002,7 @@ function render(){
   if(aEdit&&aEdit!==true&&adjIds.indexOf(aEdit)<0)aEdit=null;
   if(aDel&&adjIds.indexOf(aDel)<0)aDel=null;
   if(sumOpen&&!sumHas(sumOpen))sumOpen=null;
-  $('#app').innerHTML=tabs()+(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
+  $('#tabs').innerHTML=tabs();$('#app').innerHTML=(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
   if(pick.open&&!pick.pid&&!pick.newProd){const el=$('#pk_q');if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length)}}
   if(aEdit)refreshAdjRef();
   refreshNameHint();refreshRetailTip();
@@ -1000,7 +1031,7 @@ document.addEventListener('input',e=>{
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='mo'&&t.value){
-    month=t.value;ss('month',month);bSel=ss('bsel_'+month)||'all';
+    month=t.value;ss('month',month);bSel=rb('bsel_'+month);
     bEdit=null;bDel=null;edit=null;aEdit=null;aDel=null;aOpen=null;sumOpen=null;
     pick={open:false,q:'',pid:null,newProd:false,newName:''};
     render();return;
@@ -1050,6 +1081,7 @@ document.addEventListener('click',e=>{
   let v=b.dataset.v;
   if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
   if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();return}
+  if(a==='cardToggle'){cardOpen=(cardOpen===v?null:v);render();return}
   if(a==='sumToggle'){sumOpen=(sumOpen===v?null:v);render();return}
   if(a==='selB'){bSel=v;ss('bsel_'+month,v);bEdit=null;bDel=null;render();return}
   if(a==='export'){exportData();return}
