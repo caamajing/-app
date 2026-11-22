@@ -201,6 +201,9 @@ button{min-height:36px}.chip{min-height:34px}
 #mo{position:sticky;top:0;z-index:5;margin-bottom:14px;box-shadow:0 8px 0 0 var(--bg),0 9px 0 0 var(--ln)}
 *{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 html,body{-webkit-text-size-adjust:100%}
+.tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tg{padding:4px 12px;font-size:13px;min-height:32px;border-radius:16px}
+.newtag{border:1px dashed var(--ln);border-radius:16px;padding:4px 10px}
 </style>
 </head>
 <body>
@@ -587,6 +590,21 @@ function pickListHTML(){
   }
   return h;
 }
+let tagCache=[];
+function adjTagList(q){
+  const cnt={},last={};let k=0;
+  Object.keys(S.adjust||{}).sort().forEach(m=>(S.adjust[m]||[]).forEach(r=>{const n=String(r.note||'').trim();if(n){cnt[n]=(cnt[n]||0)+1;last[n]=k++}}));
+  const kw=q.trim().toLowerCase();
+  return Object.keys(cnt).filter(n=>!kw||n.toLowerCase().includes(kw)).sort((a,b)=>cnt[b]-cnt[a]||last[b]-last[a]).slice(0,10).map(n=>[n,cnt[n]]);
+}
+function refreshAdjTags(){
+  const box=$('#a_tags'),inp=$('#a_note');if(!box||!inp)return;
+  const q=inp.value.trim(),list=adjTagList(q);
+  tagCache=list.map(x=>x[0]);
+  let h=list.map((x,i)=>'<button type="button" class="chip tg'+(x[0]===q?' on':'')+'" data-act="adjTag" data-v="'+i+'">'+esc(x[0])+' <span style="opacity:.6">×'+x[1]+'</span></button>').join('');
+  if(q&&!tagCache.includes(q))h+='<span class="mu newtag">＋ 保存后新建标签「'+esc(q)+'」</span>';
+  box.innerHTML=h;
+}
 function refreshAdjRef(){
   const el=$('#a_ref');if(!el)return;
   const sel=$('#a_pid'),qel=$('#a_qty'),ael=$('#a_amt');
@@ -648,7 +666,8 @@ function adjForm(r){
       '<div><span class="mu">实际抵 / 换到（元，填总额）</span><input id="a_amt" type="number" step="0.1" placeholder="如 2 条共 476" value="'+esc(init.amount===''?'':init.amount)+'"></div>'+
     '</div>'+
     '<div id="a_ref" class="mu"></div>'+
-    '<div><input id="a_note" placeholder="备注，如 还款 / 换现金 / 换烟倒挂 10 元" value="'+esc(init.note||'')+'"></div>'+
+    '<div><span class="mu">备注标签（输入几个字，自动匹配已有标签；没有则保存后新建）</span><input id="a_note" placeholder="如 还款 / 换现金 / 换烟倒挂 10 元" value="'+esc(init.note||'')+'"></div>'+
+    '<div id="a_tags" class="tags"></div>'+
     '<div class="row"><button data-act="adjCancel">取消</button><button class="on" data-act="adjSave">'+(isNew?'保存并继续录入':'保存修改')+'</button></div>'+
   '</div>';
 }
@@ -1021,7 +1040,7 @@ function render(){
   const app=$('#app'),st0=app.scrollTop;
   $('#tabs').innerHTML=tabs();app.innerHTML=(tab==='log'?viewLog():tab==='sum'?viewSum():viewProd());
   if(pick.focus&&pick.open&&!pick.pid&&!pick.newProd){pick.focus=false;const el=$('#pk_q');if(el){el.focus({preventScroll:true});el.setSelectionRange(el.value.length,el.value.length)}}
-  if(aEdit)refreshAdjRef();
+  if(aEdit){refreshAdjRef();refreshAdjTags()}
   refreshNameHint();refreshRetailTip();
   app.scrollTop=st0;
   requestAnimationFrame(()=>{requestAnimationFrame(scrollChipIntoView)});
@@ -1035,6 +1054,7 @@ document.addEventListener('compositionend',e=>{
   const id=e.target.id;
   if(id==='pk_q'){pick.q=e.target.value;refreshPickList()}
   else if(id==='f_name'||id==='qp_name')refreshNameHint();
+  else if(id==='a_note')refreshAdjTags();
 });
 document.addEventListener('input',e=>{
   const id=e.target.id;
@@ -1044,6 +1064,7 @@ document.addEventListener('input',e=>{
   }
   if((id==='f_name'||id==='qp_name')&&!composing)refreshNameHint();
   if(id==='a_qty'||id==='a_pid'||id==='a_amt')refreshAdjRef();
+  if(id==='a_note'&&!composing)refreshAdjTags();
   if(id==='f_retail'||id==='qp_retail')refreshRetailTip();
 });
 document.addEventListener('change',e=>{
@@ -1100,6 +1121,7 @@ document.addEventListener('click',e=>{
   if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
   if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();$('#app').scrollTop=0;return}
   if(a==='cardToggle'){cardOpen=(cardOpen===v?null:v);render();return}
+  if(a==='adjTag'){const n=tagCache[v];if(n!==undefined){$('#a_note').value=n;refreshAdjTags()}return}
   if(a==='adjDay'){aDay=(aDay===v?null:v);aOpen=null;if(aEdit!==true)aEdit=null;aDel=null;render();return}
   if(a==='sumToggle'){sumOpen=(sumOpen===v?null:v);render();return}
   if(a==='selB'){bSel=v;ss('bsel_'+month,v);bEdit=null;bDel=null;render();return}
