@@ -3,14 +3,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <title>香烟进销记录</title>
-  <meta name="theme-color" content="#b3402a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="进销记录">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<link rel="manifest" href="manifest.webmanifest">
 <style>
 :root{--bg:#faf8f4;--card:#fff;--tx:#1d1b18;--mu:#7a746a;--ln:#e6e0d6;--ac:#b3402a;--ok:#2f7d4f;--warn:#c07d18;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171513;--card:#201d1a;--tx:#f0ebe3;--mu:#a09889;--ln:#34302b;--ac:#e0735b;--ok:#6cc08b;--warn:#d9a441;color-scheme:dark}}
@@ -175,8 +167,11 @@ input[type="date"]:hover::-webkit-calendar-picker-indicator{opacity:.85}
 .srow{border:1px solid var(--ln);border-radius:8px;padding:6px 8px;font-size:12px;min-width:0}
 .srow .nt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srow .q{color:var(--mu);font-variant-numeric:tabular-nums}
-/* 全屏 webapp：把标题从状态栏虚化区挪开 */
-body{padding-top:calc(28px + env(safe-area-inset-top, 0px))}
+/* ===== 烟贩实付价可视化：卡片徽标 + 跨批次价签 ===== */
+.dprice{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
+.dprice .tag{font-size:11px;padding:1px 6px;border-radius:8px;border:1px solid var(--ln);color:var(--mu)}
+.dprice .tag.warn{color:var(--ac);border-color:var(--ac)}
+.dtags{display:flex;flex-wrap:wrap;gap:4px;width:100%;min-width:0;margin-top:2px}
 </style>
 </head>
 <body>
@@ -337,6 +332,9 @@ const bqty=(m,id,b)=>flow(m,id).filter(f=>inB(f,b)).reduce((a,f)=>a+f.qty,0);
 const bqtyOf=(m,id,b,src)=>flow(m,id).filter(f=>inB(f,b)&&f.src===src).reduce((a,f)=>a+f.qty,0);
 const bcost=(m,id,b)=>flow(m,id).filter(f=>inB(f,b)).reduce((a,f)=>a+f.qty*f.price,0);
 const bpriceOf=(m,id,b,src)=>{const f=flow(m,id).find(f=>inB(f,b)&&f.src===src);return f?f.price:''};
+// 烟贩渠道：当前视图下的实付成本 / 加权实付均价（全部批次视图按月加权，单批视图即该批价）
+const srcCost=(m,id,b,src)=>flow(m,id).filter(f=>inB(f,b)&&f.src===src).reduce((a,f)=>a+num(f.qty)*num(f.price),0);
+const srcAvg=(m,id,b,src)=>{const q=bqtyOf(m,id,b,src);return q?srcCost(m,id,b,src)/q:0};
 const btQty=(m,b)=>S.products.reduce((a,p)=>a+bqty(m,p.id,b),0);
 const btCost=(m,b)=>S.products.reduce((a,p)=>a+bcost(m,p.id,b),0);
 const btFlag=(m,b)=>S.products.reduce((a,p)=>a+bqty(m,p.id,b)*flagOf(p),0);
@@ -747,6 +745,7 @@ function viewLog(){
   const viewMx=Math.max(1,...rows.map(p=>viewQty(p)));
   rows.forEach((p,i)=>{
     const n=qty(month,p.id),bn=bqty(month,p.id,sb),showing=sb!=='all';
+    const dq=bqtyOf(month,p.id,sb,'d'),dqCost=srcCost(month,p.id,sb,'d');
     if(showing&&!bn&&(i===0||viewQty(rows[i-1])>0)){
       h+='<div class="mu" style="margin:10px 2px 2px;border-top:1px dashed var(--ln);padding-top:8px">↓ 以下烟品本批未开（仅显示月累计）</div>';
     }
@@ -755,19 +754,50 @@ function viewLog(){
       (editor?srcRow('t','烟草',month,p,sb,bqtyOf(month,p.id,sb,'t'))+
       srcRow('d','烟贩',month,p,sb,bqtyOf(month,p.id,sb,'d')):'')+
      (bn?'<div class="sum">'+(showing?'本批 ':'')+'成本 '+fmt(bcost(month,p.id,sb))+' 元 · 红旗销售额 '+fmt0(bn*flagOf(p))+' 元 · 利润 <span class="'+(bn*flagOf(p)-bcost(month,p.id,sb)>=0?'ok':'err')+'">'+fmt0(bn*flagOf(p)-bcost(month,p.id,sb))+'</span> 元'+
-        (p.cost2?' · 烟贩价利润 <span class="'+(bn*(flagOf(p)-p.cost2)>=0?'ok':'err')+'">'+fmt0(bn*(flagOf(p)-p.cost2))+'</span> 元':'')+
+        (dq?' · 烟贩渠道利润（实付）<span class="'+(dq*flagOf(p)-dqCost>=0?'ok':'err')+'">'+fmt0(dq*flagOf(p)-dqCost)+'</span> 元':'')+
         (showing&&n?'　｜　月累计 '+n+' 条 / '+fmt0(costOf(month,p.id))+' 元':'')+'</div>':'')+
     '</div>';
     const disp=showing?bn:n;
     h+='<div class="card"><div class="row"><div><b>'+esc(p.name)+'</b> '+(p.status!=='在售'?'<span class="tag warn">'+p.status+'</span>':'')+
 '<div class="mu">'+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议 '+fmt(p.retail)+'/包 · 红旗 '+fmt(flagOf(p))+'/条</div></div>'+
 '<b style="font-size:18px">'+(showing?bn+' <span class="mu" style="font-size:12px">/ 月 '+n+'</span>':n+' 条')+'</b></div>'+
-'<div class="mu" style="margin-top:4px"><span style="color:var(--ac);font-weight:600">烟草 '+bqtyOf(month,p.id,sb,'t')+'</span> 条 · <span style="color:var(--ac);font-weight:600">烟贩 '+bqtyOf(month,p.id,sb,'d')+'</span> 条</div>'+
+'<div class="mu" style="margin-top:4px"><span style="color:var(--ac);font-weight:600">烟草 '+bqtyOf(month,p.id,sb,'t')+'</span> 条 · <span style="color:var(--ac);font-weight:600">烟贩 '+dq+'</span> 条</div>'+
+dPriceTags(month,p,sb)+
 body+(disp?'<div class="bar" style="width:'+(disp/viewMx*100)+'%"></div>':'')+
 '<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 8px;font-size:12px">'+(editor?'完成':'修改')+'</button></div>'+
 '</div>';
   });
-  return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。</div>';
+  return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。<br>'+
+    '烟贩徽标＝当前视图下烟贩渠道的加权实付均价（改过价会标红并列出与目录价的差额）；同一视图出现两种以上实付价时，自动展开逐批次价签。</div>';
+}
+
+// ===== 烟贩实付价可视化 =====
+// 主徽标：当前视图下烟贩渠道的加权实付均价，与目录参考价对比；改过价就标红。
+// 价签：仅当同一视图里出现两种以上实付价时展开，逐批次列出「第N次 @单价 ×条数」。
+function dPriceTags(m,p,b){
+  const all=flow(m,p.id).filter(f=>inB(f,b)&&f.src==='d'&&num(f.qty)>0);
+  if(!all.length)return '';
+  const base=p.cost2||0,hasBase=!!p.cost2;
+  const q=all.reduce((a,f)=>a+num(f.qty),0);
+  const avg=all.reduce((a,f)=>a+num(f.qty)*num(f.price),0)/q;
+  const dd=hasBase?avg-base:0,changed=hasBase&&Math.abs(dd)>=0.005;
+  const main='<span class="tag'+(changed?' warn':'')+'">'+(b==='all'?'本月':'本批')+'烟贩实付 '+fmt(avg)+'/条'+
+    (hasBase?(changed?' · 比目录'+(dd>0?'+':'')+fmt(dd):' · 同目录价'):' · 目录未设参考价')+'</span>';
+  const SB=sortedBatches(m);
+  const byB=SB.filter(x=>b==='all'||x.id===b).map(x=>({
+    i:SB.indexOf(x)+1,
+    q:bqtyOf(m,p.id,x.id,'d'),
+    pr:bpriceOf(m,p.id,x.id,'d')
+  })).filter(x=>x.q>0&&x.pr!==''&&x.pr!=null);
+  const uniq=new Set(byB.map(x=>num(x.pr)));
+  let detail='';
+  if(uniq.size>1){
+    detail='<div class="dtags">'+byB.map(x=>{
+      const pr=num(x.pr),off=hasBase&&Math.abs(pr-base)>=0.005;
+      return '<span class="tag'+(off?' warn':'')+'">第'+x.i+'次 @'+fmt(pr)+' ×'+x.q+'</span>';
+    }).join('')+'</div>';
+  }
+  return '<div class="dprice">'+main+detail+'</div>';
 }
 
 function srcRow(src,label,m,p,b,q){
@@ -914,7 +944,7 @@ function viewProd(){
     '<span><button data-act="edit" data-v="'+p.id+'">编辑</button> <button data-act="del" data-v="'+p.id+'">'+(delId===p.id?'再点确认删除':'删除')+'</button></span></div>'+
     (di?'<div class="err" style="font-size:12px;margin-top:6px">⚠️ 再点一次将永久删除「'+esc(p.name)+'」，并连带清掉 '+di.ms+' 个月份的 '+di.fs+' 笔进货流水'+(di.as?'、'+di.as+' 笔特殊处置':'')+'，无法撤销。若只是不再卖了，建议改为「停供」保留历史。</div>':'')+
     '<div class="mu">烟草 '+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条':'')+' · 建议零售 '+fmt(p.retail)+'/包（'+fmt(p.retail*10)+'/条）· 红旗 '+fmt(flagOf(p))+'/条</div>'+
-    '<div class="mu">建议价毛利 '+fmt(m)+'/条'+(p.actual?' · 红旗毛利 <span class="'+(p.actual-p.cost>=0?'ok':'err')+'">'+fmt(p.actual-p.cost)+'</span>/条':'')+(p.cost2?' · 烟贩价利润 <span class="'+(flagOf(p)-p.cost2>=0?'ok':'err')+'">'+fmt(flagOf(p)-p.cost2)+'</span>/条':'')+
+    '<div class="mu">建议价毛利 '+fmt(m)+'/条'+(p.actual?' · 红旗毛利 <span class="'+(p.actual-p.cost>=0?'ok':'err')+'">'+fmt(p.actual-p.cost)+'</span>/条':'')+(p.cost2?' · 目录烟贩价利润（参考）<span class="'+(flagOf(p)-p.cost2>=0?'ok':'err')+'">'+fmt(flagOf(p)-p.cost2)+'</span>/条':'')+
     avgTxt+
     (p.note?'<div class="badge">'+esc(p.note)+'</div>':'')+'</div></div>';
   });
