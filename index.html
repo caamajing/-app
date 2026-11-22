@@ -207,6 +207,7 @@ html,body{-webkit-text-size-adjust:100%}
 mark{background:rgba(255,196,60,.45);color:inherit;border-radius:2px;padding:0 1px}
 .prow{border:1px solid var(--ln);border-radius:10px;padding:8px 10px;margin-bottom:6px;background:var(--bg);min-width:0}
 .prow.on{border-color:var(--ink)}.prow .ph{cursor:pointer}
+.sk{display:inline-flex;align-items:center;gap:4px}.sk button{width:40px;height:40px;font-size:20px;padding:0}.sk .mu{min-width:16px}
 </style>
 </head>
 <body>
@@ -343,6 +344,12 @@ function sanitize(){
     }));
     if(!S.adjust[m].length)delete S.adjust[m];
   });
+  S.stock=(Array.isArray(S.stock)?S.stock:[]).map((r,i)=>{
+    const it={};
+    if(r&&r.items&&typeof r.items==='object')Object.keys(r.items).forEach(k=>{if(S.products.some(p=>p.id===k))it[k]=Math.max(0,Math.min(99999,Math.round(num(r.items[k]))))});
+    return {id:Math.max(1,Math.round(num(r&&r.id))||i+1),date:String((r&&r.date)||'').slice(0,10),items:it};
+  }).filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date));
+  const sids=new Set();S.stock.forEach(r=>{while(sids.has(r.id))r.id++;sids.add(r.id)});
   S.schema=SCHEMA;
 }
 function delImpact(id){
@@ -481,7 +488,7 @@ function importData(file){
       S=d;S.adjust=S.adjust||{};
       if(S._batches){S.log.batches=S._batches;delete S._batches}
       migrate();sanitize();
-      edit=null;delId=null;editor=false;bEdit=null;bDel=null;aEdit=null;aDel=null;aOpen=null;sumOpen=null;
+      edit=null;delId=null;editor=false;bEdit=null;bDel=null;aEdit=null;aDel=null;aOpen=null;sumOpen=null;stockDraft=null;
       bSel='all';ss('bsel_'+month,'all');
       pick={open:false,q:'',pid:null,newProd:false,newName:''};
       save();render();alert('导入成功'+(note?'（已完成兼容处理）':''));
@@ -987,6 +994,62 @@ function viewSum(){
   return h;
 }
 
+let stockOpen=false,stockDraft=null,stockQ='',stockSel=null,stockDelId=null;
+const md=d=>String(d||'').slice(5).replace('-','/');
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fmtPk=n=>{n=Math.max(0,Math.round(n||0));return Math.floor(n/10)+' 条 '+(n%10)+' 包'};
+const stockSorted=()=>(S.stock||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.id-a.id);
+function stockRecHTML(r,open){
+  const ids=Object.keys(r.items).filter(k=>P(k)),nz=ids.filter(k=>r.items[k]>0).sort((a,b)=>r.items[b]-r.items[a]);
+  let h='<div class="prow'+(open?' on':'')+'"><div class="row ph" data-act="stockSel" data-v="'+r.id+'"><b>'+esc(r.date)+'</b><span class="mu">'+ids.length+' 款'+(open?' ▴':' ▾')+'</span></div>';
+  if(open){
+    h+=(nz.length?nz.map(k=>'<div class="row" style="margin-top:4px"><span>'+esc(P(k).name)+'</span><b>'+fmtPk(r.items[k])+'</b></div>').join(''):'<div class="mu" style="margin-top:6px">这次没有填任何有存货的烟。</div>')+
+      (ids.length>nz.length?'<div class="mu" style="margin-top:6px">另有 '+(ids.length-nz.length)+' 款确认为 0。</div>':'')+
+      (stockDelId===r.id?'<div class="err" style="font-size:12px;margin-top:6px">⚠️ 再点一次将永久删除这次盘点，无法撤销。</div>':'')+
+      '<div class="row" style="margin-top:8px;justify-content:flex-end;gap:8px"><button data-act="stockEdit" data-v="'+r.id+'">修改</button><button data-act="stockDel" data-v="'+r.id+'">'+(stockDelId===r.id?'再点确认删除':'删除')+'</button></div>';
+  }
+  return h+'</div>';
+}
+function stockListHTML(){
+  const d=stockDraft,kw=stockQ.trim().toLowerCase(),of=prodAvgFn(),sc={};
+  S.products.forEach(p=>{sc[p.id]=of(p)});
+  const rows=S.products.slice().sort((a,b)=>sc[b.id]-sc[a.id]).filter(p=>!kw||[p.name,p.note].some(x=>String(x||'').toLowerCase().includes(kw)));
+  if(!S.products.length)return '<div class="mu">还没有烟品，先在上面「新增烟品」添加。</div>';
+  if(!rows.length)return '<div class="mu">没有匹配「'+esc(stockQ.trim())+'」的烟品。</div>';
+  const L=stockSorted().find(x=>x.id!==d.id);
+  const sk=(lab,id,k)=>'<span class="sk"><span class="mu">'+lab+'</span><button data-act="stStep" data-v="'+id+'" data-k="'+k+'" data-d="-1">−</button><button data-act="stStep" data-v="'+id+'" data-k="'+k+'" data-d="1">＋</button></span>';
+  return rows.map(p=>{
+    const v=d.vals[p.id],has=v!==undefined;
+    return '<div class="prow'+(has?' on':'')+'"><div class="row"><b>'+hl(p.name,kw)+'</b><span class="'+(has?'':'mu')+'">'+(has?fmtPk(v):'—')+'</span></div>'+
+      (L?'<div class="mu">上次 '+(L.items[p.id]!==undefined?fmtPk(L.items[p.id]):'未填')+' · '+md(L.date)+'</div>':'')+
+      '<div class="row" style="margin-top:6px;justify-content:flex-start;gap:10px;flex-wrap:wrap">'+sk('条',p.id,'c')+sk('包',p.id,'p')+'<button data-act="stZero" data-v="'+p.id+'" style="min-width:40px;height:40px">0</button>'+(has?'<button data-act="stClear" data-v="'+p.id+'" style="height:40px">清除</button>':'')+'</div></div>';
+  }).join('');
+}
+function stockCntText(){
+  const n=Object.keys(stockDraft.vals).filter(k=>stockDraft.vals[k]!==undefined&&P(k)).length;
+  return '已填 '+n+' 款 / 共 '+S.products.length+' 款（没动过的显示「—」，保存时按 0 计）';
+}
+function refreshStockList(){
+  if(!stockDraft)return;
+  const l=$('#st_list');if(l)l.innerHTML=stockListHTML();
+  const c=$('#st_cnt');if(c)c.textContent=stockCntText();
+}
+function stockCardHTML(){
+  const hs=stockSorted(),L=hs[0];
+  let h='<div class="card"><div class="row ph" data-act="stockToggle"><b>库存盘点'+(L?' <span class="mu">上次 '+md(L.date)+' · '+Object.keys(L.items).length+' 款</span>':'')+'</b><span class="mu">'+(stockOpen?'▴':'▾')+'</span></div>';
+  if(!stockOpen)return h+'</div>';
+  if(stockDraft){
+    return h+'<div class="bform" style="margin-top:8px"><div class="mu">'+(stockDraft.id?'修改盘点':'新建盘点')+'</div>'+
+      '<div><span class="mu">盘点日期</span><input id="st_date" type="date" value="'+esc(stockDraft.date)+'"></div>'+
+      '<div><input id="st_q" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="搜索烟名 / 备注" value="'+esc(stockQ)+'"></div>'+
+      '<div id="st_cnt" class="mu">'+esc(stockCntText())+'</div><div id="st_list">'+stockListHTML()+'</div>'+
+      '<div class="row"><button data-act="stockCancel">取消</button><button class="on" data-act="stockSave">保存盘点</button></div></div></div>';
+  }
+  h+='<div style="margin-top:8px"><button class="on" data-act="stockNew" style="width:100%">＋ 新建盘点</button></div>';
+  if(!L)return h+'<div class="mu" style="margin-top:8px;line-height:1.5">还没有盘点记录。新建时选日期，对着货架给每款烟点「条」「包」的 ＋ −，没存货的不用碰。</div></div>';
+  const cur=stockSel===null?L.id:stockSel;
+  return h+'<div class="mu" style="margin:10px 0 6px">'+(hs.length>1?'最近一次在最上面，其余是历史盘点':'最近一次盘点')+'</div>'+hs.map(r=>stockRecHTML(r,cur===r.id)).join('')+'</div>';
+}
 let prodAll=false,prodQ='',prodSel=null;
 function prodAvgFn(){
   const am=months().filter(m=>Object.keys(S.log[m]||{}).length>0).length;
@@ -1040,7 +1103,7 @@ function viewProd(){
   }
   h+='<div class="card"><div class="row ph" data-act="prodAll"><b>全部烟品 <span class="mu">'+S.products.length+' 款</span></b><span class="mu">'+(prodAll?'▴':'▾')+'</span></div>'+
     (prodAll?'<input id="ps_q" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" placeholder="搜索烟名 / 备注" value="'+esc(prodQ)+'" style="margin-top:8px"><div id="ps_list" style="margin-top:8px">'+prodListHTML()+'</div>':'')+'</div>';
-  return h;
+  return h+stockCardHTML();
 }
 
 function scrollChipIntoView(){
@@ -1073,7 +1136,7 @@ function render(){
 }
 
 let composing=false;
-const typingId=id=>id==='pk_q'||id==='f_name'||id==='qp_name'||id==='ps_q';
+const typingId=id=>id==='pk_q'||id==='f_name'||id==='qp_name'||id==='ps_q'||id==='st_q';
 document.addEventListener('compositionstart',e=>{ if(typingId(e.target.id))composing=true; });
 document.addEventListener('compositionend',e=>{
   composing=false;
@@ -1082,6 +1145,7 @@ document.addEventListener('compositionend',e=>{
   else if(id==='f_name'||id==='qp_name')refreshNameHint();
   else if(id==='a_note')refreshAdjTags();
   else if(id==='ps_q'){prodQ=e.target.value;refreshProdList()}
+  else if(id==='st_q'){stockQ=e.target.value;refreshStockList()}
 });
 document.addEventListener('input',e=>{
   const id=e.target.id;
@@ -1093,6 +1157,7 @@ document.addEventListener('input',e=>{
   if(id==='a_qty'||id==='a_pid'||id==='a_amt')refreshAdjRef();
   if(id==='a_note'&&!composing)refreshAdjTags();
   if(id==='ps_q'){prodQ=e.target.value;if(!composing)refreshProdList()}
+  if(id==='st_q'){stockQ=e.target.value;if(!composing)refreshStockList()}
   if(id==='f_retail'||id==='qp_retail')refreshRetailTip();
 });
 document.addEventListener('change',e=>{
@@ -1115,6 +1180,7 @@ document.addEventListener('change',e=>{
     }
     touch();
   }
+  if(t.id==='st_date'&&stockDraft)stockDraft.date=t.value;
   if(t.id==='a_pid'||t.id==='a_qty'||t.id==='a_amt')refreshAdjRef();
   if(t.id==='impFile'&&t.files&&t.files[0])importData(t.files[0]);
 });
@@ -1150,6 +1216,34 @@ document.addEventListener('click',e=>{
   if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();$('#app').scrollTop=0;return}
   if(a==='cardToggle'){cardOpen=(cardOpen===v?null:v);render();return}
   if(a==='adjTag'){const n=tagCache[v];if(n!==undefined){$('#a_note').value=n;refreshAdjTags()}return}
+  if(a==='stockToggle'){stockOpen=!stockOpen;render();return}
+  if(a==='stockSel'){const L0=stockSorted()[0],cur=stockSel===null?(L0&&L0.id):stockSel;stockSel=(cur===v?0:v);stockDelId=null;render();return}
+  if(a==='stockNew'){stockDraft={id:null,date:todayStr(),vals:{}};stockQ='';render();return}
+  if(a==='stockEdit'){const r=(S.stock||[]).find(x=>x.id===v);if(!r)return;stockDraft={id:r.id,date:r.date,vals:Object.assign({},r.items)};stockQ='';stockDelId=null;render();return}
+  if(a==='stockCancel'){if(Object.keys(stockDraft.vals).length&&!confirm('放弃这次盘点？已填的内容不会保存。'))return;stockDraft=null;render();return}
+  if(a==='stStep'&&stockDraft){const k=b.dataset.k,dd=Number(b.dataset.d),cur=stockDraft.vals[v]||0;stockDraft.vals[v]=Math.max(0,Math.min(99999,cur+(k==='c'?10:1)*dd));refreshStockList();return}
+  if(a==='stZero'&&stockDraft){stockDraft.vals[v]=0;refreshStockList();return}
+  if(a==='stClear'&&stockDraft){delete stockDraft.vals[v];refreshStockList();return}
+  if(a==='stockDel'){
+    if(stockDelId!==v){stockDelId=v;render();return}
+    S.stock=(S.stock||[]).filter(r=>r.id!==v);stockDelId=null;stockSel=null;touch();render();return
+  }
+  if(a==='stockSave'&&stockDraft){
+    const d=stockDraft,dt=($('#st_date')||{}).value||d.date;
+    if(!dt){alert('请选择盘点日期。');return}
+    const ids=Object.keys(d.vals).filter(k=>d.vals[k]!==undefined&&P(k));
+    if(!ids.length){alert('还没有填任何一款。没存货的烟不用填，但至少要数一款再保存。');return}
+    S.stock=S.stock||[];
+    const other=S.stock.find(r=>r.date===dt&&r.id!==d.id);
+    if(!confirm('已填 '+ids.length+' 款，其余 '+(S.products.length-ids.length)+' 款按 0 计。'+(other?'\n\n这一天已经有一次盘点，保存会覆盖它。':'')+'\n\n确认保存？'))return;
+    const items={};ids.forEach(k=>{items[k]=d.vals[k]});
+    if(other)S.stock=S.stock.filter(r=>r.id!==other.id);
+    let sid=d.id;
+    const ex=sid?S.stock.find(x=>x.id===sid):null;
+    if(ex){ex.date=dt;ex.items=items}
+    else{sid=S.stock.reduce((m,r)=>Math.max(m,r.id),0)+1;S.stock.push({id:sid,date:dt,items})}
+    stockSel=sid;stockDraft=null;touch();render();return
+  }
   if(a==='prodAll'){prodAll=!prodAll;render();return}
   if(a==='prodSel'){prodSel=(prodSel===v?null:v);render();return}
   if(a==='adjDay'){aDay=(aDay===v?null:v);aOpen=null;if(aEdit!==true)aEdit=null;aDel=null;render();return}
