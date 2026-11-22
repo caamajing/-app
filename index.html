@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <title>香烟进销记录</title>
 <style>
 :root{--bg:#faf8f4;--card:#fff;--tx:#1d1b18;--mu:#7a746a;--ln:#e6e0d6;--ac:#b3402a;--ok:#2f7d4f;--warn:#c07d18;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -199,6 +199,8 @@ button{min-height:36px}.chip{min-height:34px}
 .aday.on{border-color:var(--ink)}.aday>.ahd{font-size:13px}
 .adbody{display:grid;gap:6px;margin-top:8px;border-top:1px dashed var(--ln);padding-top:8px;min-width:0}
 #mo{position:sticky;top:0;z-index:5;margin-bottom:14px;box-shadow:0 8px 0 0 var(--bg),0 9px 0 0 var(--ln)}
+*{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+html,body{-webkit-text-size-adjust:100%}
 </style>
 </head>
 <body>
