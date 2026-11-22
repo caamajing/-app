@@ -194,6 +194,9 @@ button{min-height:36px}.chip{min-height:34px}
 .bar2{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:8px}.bar2 i{display:block;height:100%}
 .bt{background:var(--ink)}.bd{background:var(--warn)}
 .lg{font-size:12px;color:var(--mu);display:flex;gap:14px;align-items:center;margin:0 2px 8px;flex-wrap:wrap}.lg i{display:inline-block;width:14px;height:6px;border-radius:3px;margin-right:4px;vertical-align:middle}
+.aday{border:1px solid var(--ln);border-radius:10px;padding:8px 10px;background:var(--card);min-width:0}
+.aday.on{border-color:var(--ink)}.aday>.ahd{font-size:13px}
+.adbody{display:grid;gap:6px;margin-top:8px;border-top:1px dashed var(--ln);padding-top:8px;min-width:0}
 </style>
 </head>
 <body>
@@ -205,7 +208,8 @@ button{min-height:36px}.chip{min-height:34px}
 <script>
 const $=s=>document.querySelector(s);
 const KEY='ciglog_data_v2';
-let cardOpen=null;
+let cardOpen=null,aDay=null;
+const setDay=id=>{const r=((S.adjust&&S.adjust[month])||[]).find(x=>x.id===id);if(r)aDay=r.date||'none'};
 const SCHEMA=2;                       // 备份 / 本地数据格式版本
 const MAX_QTY=99999,MAX_MONEY=99999999;
 const rb=k=>{try{const v=sessionStorage.getItem(k);return v&&v!=='all'?Number(v):'all'}catch(e){return 'all'}};
@@ -655,12 +659,12 @@ function viewAdj(){
     '<div class="mu" style="margin-top:2px;font-size:11px">换出去的钱<b>低于</b>账面红旗价就<b>扣</b>利润；紧俏烟被高价收走、<b>高于</b>账面就反过来<b>加</b>利润。点条目可展开看全、修改或删除。</div>';
   if(!S.products.length)h+='<div class="mu" style="margin-top:6px">还没有烟品，先到「烟品目录」添加后才能记账。</div>';
   if(list.length){
-    h+='<div class="blist" style="margin-top:8px">'+list.map(r=>{
+    const itemHTML=r=>{
       const p=P(r.pid),book=p?r.qty*flagOf(p):r.amount,d=book-r.amount;
       const open=aOpen===r.id,editing=aEdit===r.id;
       let x='<div class="aitem'+(open?' on':'')+'">'+
         '<div class="ahd" data-act="adjToggle" data-v="'+r.id+'">'+
-          '<span class="at"><b>'+esc(p?p.name:'（烟品已删除）')+'</b> · '+r.qty+' 条 · '+(r.date?r.date.slice(5).replace('-','/'):'—')+'</span>'+
+          '<span class="at"><b>'+esc(p?p.name:'（烟品已删除）')+'</b> · '+r.qty+' 条</span>'+
           '<span class="av">'+adjDeltaHTML(d)+'</span>'+
           '<span class="ar">'+(open?'▴ 收起':'▾ 详情 / 修改')+'</span>'+
         '</div>';
@@ -682,6 +686,14 @@ function viewAdj(){
         '</div>';
       }
       return x+'</div>';
+    };
+    const keys=[...new Set(list.map(r=>r.date||'none'))].sort((a,b)=>a==='none'?1:b==='none'?-1:a.localeCompare(b));
+    h+='<div class="blist" style="margin-top:8px">'+keys.map(k=>{
+      const rs=list.filter(r=>(r.date||'none')===k);
+      const d=rs.reduce((s,r)=>{const pp=P(r.pid);return s+((pp?r.qty*flagOf(pp):r.amount)-r.amount)},0);
+      const q=rs.reduce((s,r)=>s+r.qty,0);
+      const open=aDay===k||rs.some(r=>r.id===aOpen||r.id===aEdit);
+      return '<div class="aday'+(open?' on':'')+'"><div class="ahd" data-act="adjDay" data-v="'+k+'"><span class="at"><b>'+(k==='none'?'未填日期':k.slice(5).replace('-','/')+' 日')+'</b> · '+rs.length+' 笔 · '+q+' 条</span><span class="av">'+adjDeltaHTML(d)+'</span><span class="ar">'+(open?'▴':'▾')+'</span></div>'+(open?'<div class="adbody">'+rs.map(itemHTML).join('')+'</div>':'')+'</div>';
     }).join('')+'</div>';
   }
   if(aEdit===true)h+=adjForm(null);
@@ -1082,6 +1094,7 @@ document.addEventListener('click',e=>{
   if(v!==undefined&&!isNaN(Number(v)))v=Number(v);
   if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();return}
   if(a==='cardToggle'){cardOpen=(cardOpen===v?null:v);render();return}
+  if(a==='adjDay'){aDay=(aDay===v?null:v);aOpen=null;if(aEdit!==true)aEdit=null;aDel=null;render();return}
   if(a==='sumToggle'){sumOpen=(sumOpen===v?null:v);render();return}
   if(a==='selB'){bSel=v;ss('bsel_'+month,v);bEdit=null;bDel=null;render();return}
   if(a==='export'){exportData();return}
@@ -1152,9 +1165,9 @@ document.addEventListener('click',e=>{
     if(!S.products.length){alert('先到「烟品目录」添加烟品，才能记特殊处置。');return}
     aEdit=true;aOpen=null;aDel=null;render();return
   }else if(a==='adjToggle'){
-    aOpen=(aOpen===v?null:v);aEdit=null;aDel=null;render();return
+    setDay(v);aOpen=(aOpen===v?null:v);aEdit=null;aDel=null;render();return
   }else if(a==='adjEdit'){
-    aOpen=v;aEdit=v;aDel=null;render();return
+    setDay(v);aOpen=v;aEdit=v;aDel=null;render();return
   }else if(a==='adjCancel'){aEdit=null;render();return}
   else if(a==='adjSave'){
     const pid=$('#a_pid').value;
@@ -1181,7 +1194,7 @@ document.addEventListener('click',e=>{
       arr.push(Object.assign({id},d));
       keepOpen=id;
     }
-    aEdit=null;aOpen=keepOpen;aDel=null;touch();render();return
+    aEdit=null;aOpen=keepOpen;aDay=d.date||'none';aDel=null;touch();render();return
   }else if(a==='adjDel'){
     if(aDel!==v){aDel=v;render();return}
     S.adjust[month]=(S.adjust[month]||[]).filter(r=>r.id!==v);
