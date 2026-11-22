@@ -322,6 +322,8 @@ function sanitize(){
     p.actual=Math.min(MAX_MONEY,Math.max(0,num(p.actual)));
     p.status=['在售','紧缺','停供'].indexOf(p.status)>=0?p.status:'在售';
     p.note=String(p.note||'').slice(0,200);
+    if(p.costAt)p.costAt=String(p.costAt).slice(0,10);
+    if(p.cost2At)p.cost2At=String(p.cost2At).slice(0,10);
   });
   months().forEach(m=>{
     Object.keys(S.log[m]).forEach(id=>{
@@ -464,6 +466,16 @@ function dealerSync(apply,force){
   });
   return out;
 }
+// 取某烟品最近一次烟草渠道进货价与日期（用于目录修改时的提示）
+function lastTobaccoPrice(id){
+  let best=null;
+  months().forEach(m=>flow(m,id).forEach(f=>{
+    if(f.src!=='t'||!(f.qty>0)||!(f.price>0))return;
+    const b=bt(m,f.b),dt=(b&&b.date)||(m+'-01'),k=dt+'#'+String(f.b).padStart(6,'0');
+    if(!best||k>best.k)best={k,dt,price:f.price};
+  }));
+  return best;
+}
 function touch(){
   S.updated=new Date().toISOString();
   {const ch=dealerSync(true);syncMsg=ch.length?'烟贩价已同步 '+ch.length+' 款':''}
@@ -534,7 +546,24 @@ function setPrice(m,id,src,b,price){
   const r=chkMoney(price,'进货单价',false);
   if(!r.ok)return false;
   const f=flow(m,id).find(f=>inB(f,b)&&f.src===src);
-  if(f){const pp=P(id),def=pp?(src==='d'?(pp.cost2||pp.cost):pp.cost):0;f.price=r.empty?def:r.val;if(src==='d')dealerSync(true,id)}
+  if(f){
+    const pp=P(id),def=pp?(src==='d'?(pp.cost2||pp.cost):pp.cost):0;
+    f.price=r.empty?def:r.val;
+    if(src==='d')dealerSync(true,id);
+    // 烟草渠道：若本次单价与目录参考价不同，询问是否更新目录（仅影响今后默认值）
+    if(src==='t'&&pp&&Math.abs((pp.cost||0)-f.price)>0.004){
+      const bat=bt(m,b),dt=(bat&&bat.date)||(m+'-01');
+      const msg='检测到「'+pp.name+'」烟草进货价与目录参考价不同。\n'+
+        '目录当前：'+fmt(pp.cost)+' 元/条\n'+
+        '本次录入：'+fmt(f.price)+' 元/条\n\n'+
+        '是否将 '+fmt(f.price)+' 元更新为该烟品今后的默认烟草进货价？\n'+
+        '此更新不会影响任何历史进货记录。';
+      if(confirm(msg)){
+        pp.cost=f.price;
+        pp.costAt=dt;
+      }
+    }
+  }
   return true;
 }
 
@@ -859,7 +888,8 @@ function viewLog(){
         '<div style="text-align:right;margin-top:6px"><button data-act="editCard" data-v="'+p.id+'" style="padding:2px 10px;font-size:12px">'+(editor===p.id?'完成':'修改')+'</button></div>':'')+'</div>';
   });
   return h+'<div class="mu">单位为「条」（1 条 = 10 包）。红旗售价未填时按建议价×10 计。销售额按进货量估算，未计入未售库存。<br>'+
-    '烟贩徽标＝当前视图下烟贩渠道的加权实付均价（改过价会标红并列出与目录价的差额）；同一视图出现两种以上实付价时，自动展开逐批次价签。</div>';
+    '烟贩徽标＝当前视图下烟贩渠道的加权实付均价（改过价会标红并列出与目录价的差额）；同一视图出现两种以上实付价时，自动展开逐批次价签。<br>'+
+    '烟草官方进货价：历史流水中的单价一经录入即锁定；若在某次开烟时录入了与目录不同的单价，或直接在目录中修改，仅更新今后的默认参考价，不会回溯影响任何已有记录。</div>';
 }
 
 // ===== 烟贩实付价可视化 =====
@@ -1010,7 +1040,7 @@ function viewSum(){
     '</div>';
   }).join('')+'</div>';
   h+='<div class="mu" style="margin-top:10px;line-height:1.6">'+
-    '成本按各月流水中当时记下的实际进货单价计算；销售额按<b>当前烟品目录</b>里的红旗 / 建议零售价估算，<b>仅供横向比较</b>——以后改目录价，历史月份会跟着重算。<br>'+
+    '进货成本按各月流水中当时记下的实际进货单价计算（历史单价一经录入即锁定，目录价格变更不会回溯）。销售额按<b>当前烟品目录</b>里的红旗 / 建议零售价估算，<b>仅供横向比较</b>——以后改目录售价，历史月份的销售额估算会跟着重算。<br>'+
     '估算利润＝红旗销售额 − 进货成本，未计特殊处置、未计未售库存；接近真实利润＝估算利润 − 特殊处置净影响（绿「加」红「扣」）。<br>'+
     '点月份卡片展开该月烟品明细、渠道拆分与处置逐笔。单位为元、条（1 条=10 包），空月留白不压缩时间轴。</div>';
   return h;
@@ -1101,7 +1131,7 @@ function prodListHTML(){
       '<span class="mu">烟草 '+fmt(p.cost)+'/条'+(avg>0?' · 月均 '+fmt(avg):'')+' '+(open?'▴':'▾')+'</span></div>'+
       (noteHit&&!open?'<div class="mu" style="margin-top:4px">'+hl(p.note,kw)+'</div>':'');
     if(open){
-      h+='<div class="mu" style="margin-top:8px">烟草 '+fmt(p.cost)+'/条'+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条'+(p.cost2At?'（同步自 '+md(p.cost2At)+' 进货）':''):'')+' · 建议零售 '+fmt(p.retail)+'/包（'+fmt(p.retail*10)+'/条）· 红旗 '+fmt(flagOf(p))+'/条</div>'+
+      h+='<div class="mu" style="margin-top:8px">烟草 '+fmt(p.cost)+'/条'+(p.costAt?'（同步自 '+md(p.costAt)+'）':'')+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条'+(p.cost2At?'（同步自 '+md(p.cost2At)+' 进货）':''):'')+' · 建议零售 '+fmt(p.retail)+'/包（'+fmt(p.retail*10)+'/条）· 红旗 '+fmt(flagOf(p))+'/条</div>'+
         '<div class="mu">建议价毛利 '+fmt(m)+'/条'+(p.actual?' · 红旗毛利 <span class="'+(p.actual-p.cost>=0?'ok':'err')+'">'+fmt(p.actual-p.cost)+'</span>/条':'')+(p.cost2?' · 目录烟贩价利润（参考）<span class="'+(flagOf(p)-p.cost2>=0?'ok':'err')+'">'+fmt(flagOf(p)-p.cost2)+'</span>/条':'')+(avg>0?' · 月均 <span class="ok">'+fmt(avg)+'</span> 条':'')+'</div>'+
         (p.note?'<div class="badge">'+hl(p.note,kw)+'</div>':'')+
         (di?'<div class="err" style="font-size:12px;margin-top:6px">⚠️ 再点一次将永久删除「'+esc(p.name)+'」，并连带清掉 '+di.ms+' 个月份的 '+di.fs+' 笔进货流水'+(di.as?'、'+di.as+' 笔特殊处置':'')+'，无法撤销。若只是不再进了，留着就行，历史会保留。</div>':'')+
@@ -1384,8 +1414,25 @@ document.addEventListener('click',e=>{
     const d=readProd('f');
     const dup=dupOf(d.name,edit==='new'?null:edit);
     if(dup){alert('已经有同名烟品了：'+dup.name);return}
-    if(edit==='new')S.products.push(Object.assign({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)},d));
-    else Object.assign(P(edit),d);
+    if(edit==='new'){
+      S.products.push(Object.assign({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)},d));
+    }else{
+      const oldP=P(edit);
+      // 若烟草官方进货价发生变更，给出明确提示：仅影响今后默认值，历史流水不变
+      if(oldP&&Math.abs((oldP.cost||0)-d.cost)>0.004){
+        const last=lastTobaccoPrice(edit);
+        const lastTxt=last
+          ? '最近一次实际烟草进货价为 '+fmt(last.price)+' 元（来自 '+last.dt+' 的批次）'
+          : '目前尚无烟草渠道进货记录';
+        const msg=lastTxt+'。\n\n是否将目录参考价改为 '+fmt(d.cost)+' 元，并作为该烟品今后的默认烟草进货价？\n此更改不会修改任何历史进货记录。';
+        if(!confirm(msg))return;
+        d.costAt=todayStr();
+      }
+      // 保留原有 costAt / cost2At（除非本次主动改了 cost）
+      if(d.costAt===undefined&&oldP.costAt)d.costAt=oldP.costAt;
+      if(oldP.cost2At)d.cost2At=oldP.cost2At;
+      Object.assign(oldP,d);
+    }
     edit=null;touch();render();
   }else if(a==='del'){
     if(delId!==v){delId=v;render();return}
