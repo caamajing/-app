@@ -348,6 +348,10 @@ mark{background:rgba(255,196,60,.4);color:inherit;border-radius:2px;padding:0 2p
 }
 .prow.on{border-color:var(--ink);background:var(--card)}
 .prow .ph{cursor:pointer}
+.prow.stk{position:relative}
+.prow.stk>.row:first-of-type{padding-right:20px}
+.stdot{position:absolute;top:10px;right:10px;width:11px;height:11px;border-radius:50%;box-sizing:border-box;border:2px solid var(--mu);background:transparent;opacity:.7}
+.prow.on .stdot{border-color:var(--ok);background:var(--ok);opacity:1}
 .sk{display:inline-flex;align-items:center;gap:5px}
 .sk button{width:40px;height:40px;font-size:20px;padding:0;border-radius:10px}
 .sk .mu{min-width:16px}
@@ -1207,7 +1211,30 @@ function viewSum(){
   return h;
 }
 
-let stockOpen=false,stockDraft=null,stockQ='',stockSel=null,stockDelId=null;
+let stockOpen=false,stockDraft=null,stockQ='',stockSel=null,stockDelId=null,stockGate=false;
+// 漏项检查：上次盘点有货、或两次盘点之间进过货，但这次没碰过的烟
+function stockRisk(d){
+  const out={},dt=d.date;
+  const L=stockSorted().find(x=>x.id!==d.id&&String(x.date)<dt);
+  if(!L)return out;
+  const inflow={};
+  months().forEach(m=>{
+    bts(m).forEach(b=>{
+      const bd=String(b.date||'');
+      if(!(bd>L.date&&bd<=dt))return;
+      Object.keys(S.log[m]||{}).forEach(pid=>{
+        if(pid==='batches')return;
+        flow(m,pid).forEach(f=>{if(f.b===b.id)inflow[pid]=(inflow[pid]||0)+f.qty});
+      });
+    });
+  });
+  S.products.forEach(p=>{
+    if(d.vals[p.id]!==undefined)return;
+    const last=L.items[p.id]>0?L.items[p.id]:0,inn=inflow[p.id]||0;
+    if(last||inn)out[p.id]={last:last,inn:inn};
+  });
+  return out;
+}
 const md=d=>String(d||'').slice(5).replace('-','/');
 const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fmtPk=n=>{n=Math.max(0,Math.round(n||0));return Math.floor(n/10)+' 条 '+(n%10)+' 包'};
@@ -1241,22 +1268,30 @@ function stockRecHTML(r,open){
 function stockListHTML(){
   const d=stockDraft,kw=stockQ.trim().toLowerCase(),of=prodAvgFn(),sc={};
   S.products.forEach(p=>{sc[p.id]=of(p)});
-  const rows=S.products.slice().sort((a,b)=>sc[b.id]-sc[a.id]).filter(p=>!kw||[p.name,p.note].some(x=>String(x||'').toLowerCase().includes(kw)));
+  let rows=S.products.slice().sort((a,b)=>sc[b.id]-sc[a.id]).filter(p=>!kw||[p.name,p.note].some(x=>String(x||'').toLowerCase().includes(kw)));
+  let rk={},gb='';
+  if(stockGate){
+    rk=stockRisk(d);const n=Object.keys(rk).length;
+    rows=rows.filter(p=>rk[p.id]);
+    gb='<div class="err" style="font-size:13px;margin-bottom:8px;line-height:1.5">'+(n?'还有 '+n+' 款没处理：它们上次有货，或这段时间进过货。对着货架数一下；确实卖完了就点「0」。':'<span style="color:var(--ok)">✓ 漏项都处理完了，可以保存。</span>')+'</div><div class="row" style="margin-bottom:8px;justify-content:flex-end"><button data-act="stockGateOff">查看全部烟品</button></div>';
+    if(!rows.length)return gb;
+  }
   if(!S.products.length)return '<div class="mu">还没有烟品，先在上面「新增烟品」添加。</div>';
   if(!rows.length)return '<div class="mu">没有匹配「'+esc(stockQ.trim())+'」的烟品。</div>';
   const L=stockSorted().find(x=>x.id!==d.id);
   const sk=(lab,id,k)=>'<span class="sk"><span class="mu">'+lab+'</span><button data-act="stStep" data-v="'+id+'" data-k="'+k+'" data-d="-1">−</button><button data-act="stStep" data-v="'+id+'" data-k="'+k+'" data-d="1">＋</button></span>';
-  return rows.map(p=>{
+  return gb+rows.map(p=>{
     const v=d.vals[p.id],has=v!==undefined;
-    return '<div class="prow'+(has?' on':'')+'"><div class="row"><b>'+hl(p.name,kw)+'</b><span class="'+(has?'':'mu')+'">'+(has?fmtPk(v):'—')+'</span></div>'+
+    return '<div class="prow stk'+(has?' on':'')+'"><span class="stdot" role="img" aria-label="'+(has?'已数':'未数')+'"></span><div class="row"><b>'+hl(p.name,kw)+'</b><span class="'+(has?'':'mu')+'">'+(has?fmtPk(v):'—')+'</span></div>'+
       (L?'<div class="mu">上次 '+(L.items[p.id]!==undefined?fmtPk(L.items[p.id]):'未填')+' · '+md(L.date)+'</div>':'')+
+      (rk[p.id]?'<div class="err" style="font-size:12px">'+[rk[p.id].last?'上次有 '+fmtPk(rk[p.id].last):'',rk[p.id].inn?'期间进货 '+rk[p.id].inn+' 条':''].filter(Boolean).join('，')+'，这次还没数</div>':'')+
       '<div class="row" style="margin-top:6px;justify-content:flex-start;gap:10px;flex-wrap:wrap">'+sk('条',p.id,'c')+sk('包',p.id,'p')+'<button data-act="stZero" data-v="'+p.id+'" style="min-width:40px;height:40px">0</button>'+(has?'<button data-act="stClear" data-v="'+p.id+'" style="height:40px">清除</button>':'')+'</div></div>';
   }).join('');
 }
 function stockCntText(){
   const n=Object.keys(stockDraft.vals).filter(k=>stockDraft.vals[k]!==undefined&&P(k)).length;
   const val=stockValue(stockDraft.vals);
-  return '已填 '+n+' 款 / 共 '+S.products.length+' 款'+(val>0?' · 库存价值 '+fmt(val)+' 元':'')+'（没动过的显示「—」，保存时按 0 计；价值按烟草批发价）';
+  return '已填 '+n+' 款 / 共 '+S.products.length+' 款'+(val>0?' · 库存价值 '+fmt(val)+' 元':'')+'（没动过的显示「—」，不会记为 0；确认没货请点「0」；价值按烟草批发价）';
 }
 function refreshStockList(){
   if(!stockDraft)return;
@@ -1446,11 +1481,12 @@ document.addEventListener('click',e=>{
   if(a==='tab'){tab=v;ss('tab',v);edit=null;bEdit=null;pick={open:false,q:'',pid:null,newProd:false,newName:''};render();$('#app').scrollTop=0;return}
   if(a==='cardToggle'){cardOpen=(cardOpen===v?null:v);render();return}
   if(a==='adjTag'){const n=tagCache[v];if(n!==undefined){$('#a_note').value=n;refreshAdjTags()}return}
+  if(a==='stockGateOff'){stockGate=false;render();return}
   if(a==='stockToggle'){stockOpen=!stockOpen;render();return}
   if(a==='stockSel'){const L0=stockSorted()[0],cur=stockSel===null?(L0&&L0.id):stockSel;stockSel=(cur===v?0:v);stockDelId=null;render();return}
-  if(a==='stockNew'){stockDraft={id:null,date:todayStr(),vals:{}};stockQ='';render();return}
-  if(a==='stockEdit'){const r=(S.stock||[]).find(x=>x.id===v);if(!r)return;stockDraft={id:r.id,date:r.date,vals:Object.assign({},r.items)};stockQ='';stockDelId=null;render();return}
-  if(a==='stockCancel'){if(Object.keys(stockDraft.vals).length&&!confirm('放弃这次盘点？已填的内容不会保存。'))return;stockDraft=null;render();return}
+  if(a==='stockNew'){stockDraft={id:null,date:todayStr(),vals:{}};stockQ='';stockGate=false;render();return}
+  if(a==='stockEdit'){const r=(S.stock||[]).find(x=>x.id===v);if(!r)return;stockDraft={id:r.id,date:r.date,vals:Object.assign({},r.items)};stockQ='';stockGate=false;stockDelId=null;render();return}
+  if(a==='stockCancel'){if(Object.keys(stockDraft.vals).length&&!confirm('放弃这次盘点？已填的内容不会保存。'))return;stockDraft=null;stockGate=false;render();return}
   if(a==='stStep'&&stockDraft){const k=b.dataset.k,dd=Number(b.dataset.d),cur=stockDraft.vals[v]||0;stockDraft.vals[v]=Math.max(0,Math.min(99999,cur+(k==='c'?10:1)*dd));refreshStockList();return}
   if(a==='stZero'&&stockDraft){stockDraft.vals[v]=0;refreshStockList();return}
   if(a==='stClear'&&stockDraft){delete stockDraft.vals[v];refreshStockList();return}
@@ -1463,16 +1499,19 @@ document.addEventListener('click',e=>{
     if(!dt){alert('请选择盘点日期。');return}
     const ids=Object.keys(d.vals).filter(k=>d.vals[k]!==undefined&&P(k));
     if(!ids.length){alert('还没有填任何一款。没存货的烟不用填，但至少要数一款再保存。');return}
+    d.date=dt;
+    const rk=stockRisk(d),rn=Object.keys(rk).length;
+    if(rn&&!stockGate){stockGate=true;stockQ='';render();return}
     S.stock=S.stock||[];
     const other=S.stock.find(r=>r.date===dt&&r.id!==d.id);
-    if(!confirm('已填 '+ids.length+' 款，其余 '+(S.products.length-ids.length)+' 款按 0 计。'+(other?'\n\n这一天已经有一次盘点，保存会覆盖它。':'')+'\n\n确认保存？'))return;
+    if(!confirm('已填 '+ids.length+' 款，其余 '+(S.products.length-ids.length)+' 款不记录（不会记为 0）。'+(rn?'\n\n其中 '+rn+' 款上次有货或期间进过货，仍没数，对账时会算「缺数据」。':'')+(other?'\n\n这一天已经有一次盘点，保存会覆盖它。':'')+'\n\n确认保存？'))return;
     const items={};ids.forEach(k=>{items[k]=d.vals[k]});
     if(other)S.stock=S.stock.filter(r=>r.id!==other.id);
     let sid=d.id;
     const ex=sid?S.stock.find(x=>x.id===sid):null;
     if(ex){ex.date=dt;ex.items=items}
     else{sid=S.stock.reduce((m,r)=>Math.max(m,r.id),0)+1;S.stock.push({id:sid,date:dt,items})}
-    stockSel=sid;stockDraft=null;touch();render();return
+    stockSel=sid;stockDraft=null;stockGate=false;touch();render();return
   }
   if(a==='prodAll'){prodAll=!prodAll;render();return}
   if(a==='prodSel'){prodSel=(prodSel===v?null:v);render();return}
