@@ -1211,13 +1211,28 @@ let stockOpen=false,stockDraft=null,stockQ='',stockSel=null,stockDelId=null;
 const md=d=>String(d||'').slice(5).replace('-','/');
 const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fmtPk=n=>{n=Math.max(0,Math.round(n||0));return Math.floor(n/10)+' 条 '+(n%10)+' 包'};
+// 库存价值：按当前目录烟草批发价（元/条）估算，1 条 = 10 包
+function stockValue(items){
+  let v=0;
+  Object.keys(items||{}).forEach(id=>{
+    const p=P(id),q=Math.max(0,Math.round(num(items[id])));
+    if(!p||!q)return;
+    v+=q/10*(p.cost||0);
+  });
+  return v;
+}
 const stockSorted=()=>(S.stock||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.id-a.id);
 function stockRecHTML(r,open){
   const ids=Object.keys(r.items).filter(k=>P(k)),nz=ids.filter(k=>r.items[k]>0).sort((a,b)=>r.items[b]-r.items[a]);
-  let h='<div class="prow'+(open?' on':'')+'"><div class="row ph" data-act="stockSel" data-v="'+r.id+'"><b>'+esc(r.date)+'</b><span class="mu">'+ids.length+' 款'+(open?' ▴':' ▾')+'</span></div>';
+  const val=stockValue(r.items);
+  let h='<div class="prow'+(open?' on':'')+'"><div class="row ph" data-act="stockSel" data-v="'+r.id+'"><b>'+esc(r.date)+'</b><span class="mu">'+ids.length+' 款'+(val>0?' · '+fmt(val)+' 元':'')+(open?' ▴':' ▾')+'</span></div>';
   if(open){
-    h+=(nz.length?nz.map(k=>'<div class="row" style="margin-top:4px"><span>'+esc(P(k).name)+'</span><b>'+fmtPk(r.items[k])+'</b></div>').join(''):'<div class="mu" style="margin-top:6px">这次没有填任何有存货的烟。</div>')+
+    h+=(nz.length?nz.map(k=>{
+      const p=P(k),q=r.items[k],lineVal=q/10*(p.cost||0);
+      return '<div class="row" style="margin-top:4px"><span>'+esc(p.name)+'</span><b>'+fmtPk(q)+(lineVal>0?' <span class="mu">· '+fmt(lineVal)+' 元</span>':'')+'</b></div>';
+    }).join(''):'<div class="mu" style="margin-top:6px">这次没有填任何有存货的烟。</div>')+
       (ids.length>nz.length?'<div class="mu" style="margin-top:6px">另有 '+(ids.length-nz.length)+' 款确认为 0。</div>':'')+
+      (val>0?'<div class="mu" style="margin-top:8px;padding-top:6px;border-top:1px dashed var(--ln)">库存价值（按烟草批发价）<b style="float:right;color:var(--tx)">'+fmt(val)+' 元</b></div>':'')+
       (stockDelId===r.id?'<div class="err" style="font-size:12px;margin-top:6px">⚠️ 再点一次将永久删除这次盘点，无法撤销。</div>':'')+
       '<div class="row" style="margin-top:8px;justify-content:flex-end;gap:8px"><button data-act="stockEdit" data-v="'+r.id+'">修改</button><button data-act="stockDel" data-v="'+r.id+'">'+(stockDelId===r.id?'再点确认删除':'删除')+'</button></div>';
   }
@@ -1240,7 +1255,8 @@ function stockListHTML(){
 }
 function stockCntText(){
   const n=Object.keys(stockDraft.vals).filter(k=>stockDraft.vals[k]!==undefined&&P(k)).length;
-  return '已填 '+n+' 款 / 共 '+S.products.length+' 款（没动过的显示「—」，保存时按 0 计）';
+  const val=stockValue(stockDraft.vals);
+  return '已填 '+n+' 款 / 共 '+S.products.length+' 款'+(val>0?' · 库存价值 '+fmt(val)+' 元':'')+'（没动过的显示「—」，保存时按 0 计；价值按烟草批发价）';
 }
 function refreshStockList(){
   if(!stockDraft)return;
@@ -1249,7 +1265,8 @@ function refreshStockList(){
 }
 function stockCardHTML(){
   const hs=stockSorted(),L=hs[0];
-  let h='<div class="card"><div class="row ph" data-act="stockToggle"><b>库存盘点'+(L?' <span class="mu">上次 '+md(L.date)+' · '+Object.keys(L.items).length+' 款</span>':'')+'</b><span class="mu">'+(stockOpen?'▴':'▾')+'</span></div>';
+  const lastVal=L?stockValue(L.items):0;
+  let h='<div class="card"><div class="row ph" data-act="stockToggle"><b>库存盘点'+(L?' <span class="mu">上次 '+md(L.date)+' · '+Object.keys(L.items).length+' 款'+(lastVal>0?' · '+fmt(lastVal)+' 元':'')+'</span>':'')+'</b><span class="mu">'+(stockOpen?'▴':'▾')+'</span></div>';
   if(!stockOpen)return h+'</div>';
   if(stockDraft){
     return h+'<div class="bform" style="margin-top:8px"><div class="mu">'+(stockDraft.id?'修改盘点':'新建盘点')+'</div>'+
