@@ -353,6 +353,9 @@ mark{background:rgba(255,196,60,.4);color:inherit;border-radius:2px;padding:0 2p
 .strow>b{flex-shrink:0;white-space:nowrap;font-size:13px;font-weight:600}
 .strow>b .mu{font-size:11.5px}
 .stsub{font-size:11.5px;white-space:nowrap}
+.pname{min-width:0;font-size:13.5px;line-height:1.35}
+.pname b{font-weight:600}
+.pmeta{font-size:11.5px;white-space:nowrap;flex-shrink:0}
 .prow.stk{position:relative}
 .prow.stk>.row:first-of-type{padding-right:20px}
 .stdot{position:absolute;top:10px;right:10px;width:11px;height:11px;border-radius:50%;box-sizing:border-box;border:2px solid var(--mu);background:transparent;opacity:.7}
@@ -1345,8 +1348,8 @@ function prodListHTML(){
     const m=p.retail*10-p.cost,di=delId===p.id?delImpact(p.id):null,avg=of(p);
     const open=prodSel===p.id||delId===p.id;
     const noteHit=kw&&String(p.note||'').toLowerCase().includes(kw);
-    h+='<div class="prow'+(open?' on':'')+'"><div class="row ph" data-act="prodSel" data-v="'+p.id+'"><div><b>'+hl(p.name,kw)+'</b></div>'+
-      '<span class="mu">烟草 '+fmt(p.cost)+'/条'+(avg>0?' · 月均 '+fmt(avg):'')+' '+(open?'▴':'▾')+'</span></div>'+
+    h+='<div class="prow'+(open?' on':'')+'"><div class="row ph" data-act="prodSel" data-v="'+p.id+'"><div class="pname"><b>'+hl(p.name,kw)+'</b></div>'+
+      '<span class="mu pmeta">烟草 '+fmt(p.cost)+'/条'+(avg>0?' · 月均 '+fmt(avg):'')+' '+(open?'▴':'▾')+'</span></div>'+
       (noteHit&&!open?'<div class="mu" style="margin-top:4px">'+hl(p.note,kw)+'</div>':'');
     if(open){
       h+='<div class="mu" style="margin-top:8px">烟草 '+fmt(p.cost)+'/条'+(p.costAt?'（同步自 '+md(p.costAt)+'）':'')+(p.cost2?' · 烟贩 '+fmt(p.cost2)+'/条'+(p.cost2At?'（同步自 '+md(p.cost2At)+' 进货）':''):'')+' · 建议零售 '+fmt(p.retail)+'/包（'+fmt(p.retail*10)+'/条）· 红旗 '+fmt(flagOf(p))+'/条</div>'+
